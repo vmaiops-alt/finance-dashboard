@@ -119,4 +119,46 @@ def seed_database(db: Session):
         db.commit()
 
     if db.query(Jurisdiction).count() == 0:
-     
+        for j_data in DEFAULT_JURISDICTIONS:
+            j = Jurisdiction(**j_data)
+            db.add(j)
+        db.commit()
+
+        # Add default tax rules
+        jurisdictions = {j.name: j for j in db.query(Jurisdiction).all()}
+
+        default_rules = [
+            # Cyprus
+            (jurisdictions["Cyprus"].id, TransferType.DIVIDEND, 0.0, "No WHT on dividends to non-residents"),
+            (jurisdictions["Cyprus"].id, TransferType.SALARY, 0.0, "No personal income tax for non-domiciled"),
+            (jurisdictions["Cyprus"].id, TransferType.MANAGEMENT_FEE, 0.125, "Deductible at company level, taxed as corp income if received by CY entity"),
+            # UAE
+            (jurisdictions["UAE / Dubai"].id, TransferType.DIVIDEND, 0.0, "No WHT on dividends"),
+            (jurisdictions["UAE / Dubai"].id, TransferType.SALARY, 0.0, "No personal income tax"),
+            (jurisdictions["UAE / Dubai"].id, TransferType.LOAN, 0.0, "No tax on loan disbursements"),
+            # Germany
+            (jurisdictions["Deutschland"].id, TransferType.DIVIDEND, 0.2638, "Abgeltungssteuer 26.375% + Soli"),
+            (jurisdictions["Deutschland"].id, TransferType.SALARY, 0.42, "Top marginal rate 42%"),
+            # Schweiz
+            (jurisdictions["Schweiz"].id, TransferType.DIVIDEND, 0.35, "35% Verrechnungssteuer (r\u00fcckforderbar bei DBA)"),
+            (jurisdictions["Schweiz"].id, TransferType.SALARY, 0.115, "Direkte Bundessteuer max. 11.5%, zzgl. Kantonssteuer"),
+            (jurisdictions["Schweiz"].id, TransferType.MANAGEMENT_FEE, 0.15, "WHT auf Management Fees an Ausland ~15% (DBA-abh\u00e4ngig)"),
+            # BVI
+            (jurisdictions["BVI"].id, TransferType.DIVIDEND, 0.0, "No WHT on dividends"),
+            (jurisdictions["BVI"].id, TransferType.SALARY, 0.0, "No personal income tax"),
+            (jurisdictions["BVI"].id, TransferType.MANAGEMENT_FEE, 0.0, "No withholding on fees"),
+            # Singapur
+            (jurisdictions["Singapur"].id, TransferType.DIVIDEND, 0.0, "No WHT on dividends (one-tier system)"),
+            (jurisdictions["Singapur"].id, TransferType.SALARY, 0.22, "Top marginal rate 22% \u00fcber 320k SGD"),
+            (jurisdictions["Singapur"].id, TransferType.MANAGEMENT_FEE, 0.17, "WHT on management fees to non-residents 17%"),
+            # Panama
+            (jurisdictions["Panama"].id, TransferType.DIVIDEND, 0.10, "10% WHT auf Dividenden (5% f\u00fcr SA)"),
+            (jurisdictions["Panama"].id, TransferType.SALARY, 0.0, "Foreign-source income steuerfrei (Territorial)"),
+            (jurisdictions["Panama"].id, TransferType.MANAGEMENT_FEE, 0.125, "12.5% WHT auf Fees an Ausland"),
+        ]
+
+        for jid, ttype, rate, desc in default_rules:
+            db.add(TaxRule(jurisdiction_id=jid, transfer_type=ttype, tax_rate=rate, description=desc))
+        db.commit()
+
+    print("\u2713 Database seeded successfully")

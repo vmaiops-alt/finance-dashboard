@@ -226,3 +226,35 @@ class RunwayAnalysis(BaseModel):
     runway_until_date: Optional[str] = None
     target_date: Optional[str] = None
     amount_needed_for_target: Optional[float] = None
+
+
+# ── Simulation ────────────────────────────────────────────────────────────
+
+class SimulationEntry(BaseModel):
+    label: str
+    amount: float
+    month: str  # "2026-05"
+    type: str = "income"  # income | expense
+    recurring: bool = False
+    recur_until: Optional[str] = None  # "2027-12"
+
+class SimulationScenario(BaseModel):
+    name: str
+    entries: List[SimulationEntry]
+
+class SimulationRequest(BaseModel):
+    scenarios: List[SimulationScenario]
+    months: int = 24
+    include_baseline: bool = True
+
+class SimulationMonthData(BaseModel):
+    month: str
+    baseline: Optional[float] = None
+    scenarios: dict  # {scenario_name: balance}
+
+class SimulationResult(BaseModel):
+    current_balance: float
+    avg_monthly_income: float
+    avg_monthly_expenses: float
+    months_data: List[SimulationMonthData]
+    scenario_summaries: List[dict]  # [{name, final_balance, delta_vs_baseline}]
