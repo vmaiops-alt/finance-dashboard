@@ -1,9 +1,4 @@
-# Ignore backend source for frontend build
-backend/
 .git
 .gitignore
-README.md
 *.md
-
-# Frontend build output should not be ignored
-# but we keep it minimal
+app.html
