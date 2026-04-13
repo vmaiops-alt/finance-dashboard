@@ -4,8 +4,16 @@
   "outputDirectory": "frontend/dist",
   "routes": [
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.py"
+    },
+    {
+      "src": "/(.*\\.[a-zA-Z0-9]+)$",
+      "dest": "/$1"
     },
     {
       "src": "/(.*)",
