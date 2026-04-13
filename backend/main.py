@@ -9,6 +9,12 @@ from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from typing import List, Optional
 import json
+import hashlib
+import os
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from pydantic import BaseModel as PydanticBaseModel
 
 from database import engine, get_db, Base
 from models import (
@@ -33,6 +39,42 @@ from tax_engine import compute_transfer_tax, compute_corporate_tax
 from import_engine import import_transactions
 from seed_data import seed_database
 
+
+# ── Authentication ─────────────────────────────────────────────────────────
+
+DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "admin123")
+AUTH_SECRET = os.environ.get("AUTH_SECRET", "financehq-secret-key-2024")
+
+def generate_token(password: str) -> str:
+    return hashlib.sha256((password + AUTH_SECRET).encode()).hexdigest()
+
+def verify_token(token: str) -> bool:
+    expected = generate_token(DASHBOARD_PASSWORD)
+    return token == expected
+
+class AuthLoginRequest(PydanticBaseModel):
+    password: str
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        # Allow login endpoint, OPTIONS (CORS), and non-API routes
+        if (path == "/api/auth/login" or
+            request.method == "OPTIONS" or
+            not path.startswith("/api/")):
+            return await call_next(request)
+        
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(status_code=401, content={"detail": "Nicht authentifiziert"})
+        
+        token = auth_header[7:]
+        if not verify_token(token):
+            return JSONResponse(status_code=401, content={"detail": "Ungültiger Token"})
+        
+        return await call_next(request)
+
+
 # ── App Setup ──────────────────────────────────────────────────────────────
 
 Base.metadata.create_all(bind=engine)
@@ -47,6 +89,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(AuthMiddleware)
+
 
 @app.on_event("startup")
 def on_startup():
@@ -57,6 +101,23 @@ def on_startup():
     finally:
         db.close()
 
+
+
+
+# ── Auth Endpoints ─────────────────────────────────────────────────────────
+
+@app.post("/api/auth/login")
+def auth_login(req: AuthLoginRequest):
+    if req.password \!= DASHBOARD_PASSWORD:
+        raise HTTPException(status_code=401, detail="Falsches Passwort")
+    return {"token": generate_token(req.password), "authenticated": True}
+
+@app.get("/api/auth/check")
+def auth_check(request: Request):
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer ") or not verify_token(auth_header[7:]):
+        raise HTTPException(status_code=401, detail="Nicht authentifiziert")
+    return {"authenticated": True}
 
 # ══════════════════════════════════════════════════════════════════════════
 # JURISDICTIONS

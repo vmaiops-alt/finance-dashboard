@@ -1,9 +1,6 @@
 import axios from 'axios'
 
-// Determine API base URL based on environment
 const getBaseURL = () => {
-  // In development, use localhost:8000 via Vite proxy
-  // In production, use same origin (Vercel will route /api/* to the serverless function)
   if (import.meta.env.DEV) {
     return '/api'
   }
@@ -14,6 +11,27 @@ const api = axios.create({
   baseURL: getBaseURL(),
   headers: { 'Content-Type': 'application/json' },
 })
+
+// Add auth token to all requests
+api.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem('auth_token')
+  if (token) {
+    config.headers.Authorization = 'Bearer ' + token
+  }
+  return config
+})
+
+// Redirect to login on 401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && \!error.config.url.includes('/auth/')) {
+      sessionStorage.removeItem('auth_token')
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
 // ── Dashboard ──────────────────────────────────────────────────────────
 export const getDashboardSummary = (year, month) =>

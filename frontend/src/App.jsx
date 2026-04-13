@@ -2,7 +2,7 @@ import React from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, Building2,
-  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard
+  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard, LogOut
 } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
@@ -13,6 +13,9 @@ import TaxOverview from './pages/TaxOverview'
 import Runway from './pages/Runway'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
+import LoginPage from './pages/LoginPage'
+import ProtectedRoute from './components/ProtectedRoute'
+import { useAuth } from './context/AuthContext'
 
 const NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,12 +29,11 @@ const NAV_ITEMS = [
   { path: '/settings', icon: Settings, label: 'Einstellungen' },
 ]
 
-export default function App() {
-  const location = useLocation()
+function AppLayout() {
+  const { logout } = useAuth()
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
       <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
         <div className="p-5 border-b border-gray-800">
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -62,11 +64,16 @@ export default function App() {
         </nav>
 
         <div className="p-4 border-t border-gray-800">
-          <div className="text-xs text-gray-600">FinanceHQ v1.0</div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 text-xs text-gray-500 hover:text-red-400 transition-colors w-full"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Abmelden
+          </button>
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto p-6">
           <Routes>
@@ -83,5 +90,18 @@ export default function App() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/*" element={
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      } />
+    </Routes>
   )
 }
