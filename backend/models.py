@@ -241,3 +241,24 @@ class ExchangeRate(Base):
     rate = Column(Float, nullable=False)
     rate_date = Column(Date, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# ── Category Rules (User-defined categorization memory) ────────────────────
+
+class CategoryRule(Base):
+    """Stores user-learned categorization rules.
+    When a user manually categorizes a transaction, a rule is created so
+    future transactions with the same counterparty/description pattern
+    are auto-categorized."""
+    __tablename__ = "category_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    match_field = Column(String, nullable=False, default="counterparty")  # counterparty | description | both
+    match_pattern = Column(String, nullable=False)  # The text pattern to match (case-insensitive contains)
+    match_type = Column(String, default="contains")  # contains | exact | startswith
+    priority = Column(Integer, default=0)  # Higher = checked first
+    is_user_created = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    category = relationship("Category")

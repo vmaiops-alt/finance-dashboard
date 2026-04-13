@@ -258,3 +258,33 @@ class SimulationResult(BaseModel):
     avg_monthly_expenses: float
     months_data: List[SimulationMonthData]
     scenario_summaries: List[dict]  # [{name, final_balance, delta_vs_baseline}]
+
+
+# ── Category Rules ─────────────────────────────────────────────────────────
+
+class CategoryRuleCreate(BaseModel):
+    category_id: int
+    match_field: str = "counterparty"  # counterparty | description | both
+    match_pattern: str
+    match_type: str = "contains"  # contains | exact | startswith
+    priority: int = 0
+
+class CategoryRuleOut(CategoryRuleCreate):
+    id: int
+    is_user_created: bool
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+
+# ── Transaction Update (partial) ──────────────────────────────────────────
+
+class TransactionUpdate(BaseModel):
+    category_id: Optional[int] = None
+    description: Optional[str] = None
+    counterparty: Optional[str] = None
+    transaction_type: Optional[TransactionType] = None
+    amount: Optional[float] = None
+    is_recurring: Optional[bool] = None
+    recurring_interval: Optional[str] = None
+    tags: Optional[List[str]] = None

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react'
-import { importFile, getEntities, getAccounts } from '../api'
+import { Upload, FileText, CheckCircle, AlertCircle, Sparkles, RefreshCw } from 'lucide-react'
+import { importFile, getEntities, getAccounts, autoCategorize, getRecurringTransactions } from '../api'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'AED', 'CHF']
 
@@ -45,7 +45,14 @@ export default function ImportPage() {
 
     try {
       const res = await importFile(formData)
-      setResult(res)
+      // After import: auto-categorize + detect recurring
+      let catResult = null
+      let recurResult = null
+      try {
+        catResult = await autoCategorize(entityId || null, true)
+        recurResult = await getRecurringTransactions(entityId || null)
+      } catch (e) { /* non-critical */ }
+      setResult({ ...res, categorization: catResult, recurring: recurResult })
     } catch (err) {
       setResult({ error: err.response?.data?.detail || 'Import fehlgeschlagen' })
     } finally {
@@ -156,6 +163,21 @@ export default function ImportPage() {
               <p className="text-emerald-400">{result.imported} Transaktionen importiert</p>
               {result.skipped > 0 && <p className="text-yellow-400">{result.skipped} Zeilen übersprungen</p>}
               <p className="text-gray-500">Gesamt: {result.total_rows} Zeilen in der Datei</p>
+              {result.categorization && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span className="text-purple-400">{result.categorization.categorized} Transaktionen automatisch kategorisiert</span>
+                  {result.categorization.remaining_uncategorized > 0 && (
+                    <span className="text-gray-500">({result.categorization.remaining_uncategorized} noch offen)</span>
+                  )}
+                </div>
+              )}
+              {result.recurring && result.recurring.count > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-400">{result.recurring.count} wiederkehrende Zahlungen erkannt</span>
+                </div>
+              )}
               {result.errors?.length > 0 && (
                 <div className="mt-3">
                   <p className="text-gray-400 font-medium">Fehler:</p>

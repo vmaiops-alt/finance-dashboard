@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import List, Optional
 import pandas as pd
 from sqlalchemy.orm import Session
-from models import Category, Transaction, TransactionType, Currency
+from models import Category, CategoryRule, Transaction, TransactionType, Currency
 
 
 # Common date formats found in German & international bank statements
@@ -95,15 +95,36 @@ def parse_amount(amount_str) -> Optional[float]:
         return None
 
 
-def auto_categorize(description: str, categories: List[Category]) -> Optional[int]:
-    """Match transaction description against category keywords."""
-    if not description:
+def auto_categorize(description: str, counterparty: str, categories: List[Category], rules: List = None) -> Optional[int]:
+    """Match transaction against rules first, then category keywords."""
+    combined = f"{description or ''} {counterparty or ''}".lower()
+    if not combined.strip():
         return None
-    desc_lower = description.lower()
+    
+    # Layer 1: User-defined rules (highest priority)
+    if rules:
+        for rule in rules:
+            text_to_check = ""
+            if rule.match_field == "counterparty":
+                text_to_check = (counterparty or "").lower()
+            elif rule.match_field == "description":
+                text_to_check = (description or "").lower()
+            elif rule.match_field == "both":
+                text_to_check = combined
+            
+            pattern = rule.match_pattern.lower()
+            if rule.match_type == "contains" and pattern in text_to_check:
+                return rule.category_id
+            elif rule.match_type == "exact" and pattern == text_to_check.strip():
+                return rule.category_id
+            elif rule.match_type == "startswith" and text_to_check.startswith(pattern):
+                return rule.category_id
+    
+    # Layer 2: Category keyword matching
     for cat in categories:
         if cat.keywords:
             for kw in cat.keywords:
-                if kw.lower() in desc_lower:
+                if kw.lower() in combined:
                     return cat.id
     return None
 
@@ -209,8 +230,9 @@ def import_transactions(
     if not date_col or not amount_col:
         return {"imported": 0, "skipped": 0, "errors": ["Could not identify date and amount columns"]}
 
-    # Load categories for auto-categorization
+    # Load categories and rules for auto-categorization
     categories = db.query(Category).all()
+    rules = db.query(CategoryRule).order_by(CategoryRule.priority.desc()).all()
 
     imported = 0
     skipped = 0
@@ -238,8 +260,8 @@ def import_transactions(
             tx_type = TransactionType.INCOME if amount >= 0 else TransactionType.EXPENSE
             amount = abs(amount)
 
-            # Auto-categorize
-            cat_id = auto_categorize(desc + " " + counterparty, categories)
+            # Auto-categorize (rules + keywords)
+            cat_id = auto_categorize(desc, counterparty, categories, rules)
 
             tx = Transaction(
                 entity_id=entity_id,

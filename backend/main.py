@@ -18,7 +18,7 @@ from database import engine, get_db, Base
 from models import (
     Jurisdiction, TaxRule, Entity, EntityType, Account, Category,
     Transaction, TransactionType, Transfer, TransferType, Currency,
-    Loan, LoanRepayment, Budget, ExchangeRate,
+    Loan, LoanRepayment, Budget, ExchangeRate, CategoryRule,
 )
 from schemas import (
     JurisdictionCreate, JurisdictionOut,
@@ -32,9 +32,11 @@ from schemas import (
     LoanRepaymentCreate, LoanRepaymentOut,
     BudgetCreate, BudgetOut,
     DashboardSummary, CashflowProjection, RunwayAnalysis,
+    CategoryRuleCreate, CategoryRuleOut, TransactionUpdate,
 )
 from tax_engine import compute_transfer_tax, compute_corporate_tax
 from import_engine import import_transactions
+from categorize_engine import apply_rules_to_transaction, detect_recurring_transactions, auto_categorize_all
 from seed_data import seed_database
 
 # ── App Setup ───────────────────────────────────────────────────────────────────
@@ -332,6 +334,33 @@ def delete_category(cid: int, db: Session = Depends(get_db)):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# CATEGORY RULES (User-defined categorization memory)
+# ══════════════════════════════════════════════════════════════════════
+
+@app.get("/api/category-rules", response_model=List[CategoryRuleOut])
+def list_category_rules(db: Session = Depends(get_db)):
+    return db.query(CategoryRule).order_by(CategoryRule.priority.desc()).all()
+
+
+@app.post("/api/category-rules", response_model=CategoryRuleOut)
+def create_category_rule(data: CategoryRuleCreate, db: Session = Depends(get_db)):
+    r = CategoryRule(**data.model_dump())
+    db.add(r)
+    db.commit()
+    db.refresh(r)
+    return r
+
+
+@app.delete("/api/category-rules/{rid}")
+def delete_category_rule(rid: int, db: Session = Depends(get_db)):
+    r = db.query(CategoryRule).get(rid)
+    if r:
+        db.delete(r)
+        db.commit()
+    return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════
 # TRANSACTIONS
 # ══════════════════════════════════════════════════════════════════════
 
@@ -423,6 +452,50 @@ def delete_transaction(tid: int, db: Session = Depends(get_db)):
         db.delete(tx)
         db.commit()
     return {"ok": True}
+
+
+# ── Transaction inline update (PATCH for category editing etc.) ──────
+
+@app.patch("/api/transactions/{tid}", response_model=TransactionOut)
+def patch_transaction(tid: int, data: TransactionUpdate, db: Session = Depends(get_db)):
+    tx = db.query(Transaction).get(tid)
+    if not tx:
+        raise HTTPException(404)
+    
+    update_data = data.model_dump(exclude_unset=True)
+    
+    # If category is being set, auto-create a rule for future transactions
+    if "category_id" in update_data and update_data["category_id"] is not None:
+        from categorize_engine import create_rule_from_categorization
+        create_rule_from_categorization(db, tx, update_data["category_id"])
+    
+    for k, v in update_data.items():
+        setattr(tx, k, v)
+    
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+
+@app.post("/api/transactions/auto-categorize")
+def auto_categorize_transactions(
+    entity_id: Optional[int] = None,
+    only_uncategorized: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Run auto-categorization on transactions using rules + keywords + AI."""
+    result = auto_categorize_all(db, entity_id, only_uncategorized)
+    return result
+
+
+@app.get("/api/transactions/recurring")
+def get_recurring_transactions(
+    entity_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Detect and return recurring payments."""
+    result = detect_recurring_transactions(db, entity_id)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════

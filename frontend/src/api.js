@@ -158,3 +158,28 @@ export const importFile = (formData) =>
   }).then(r => r.data)
 
 export default api
+
+// ── Category Rules ─────────────────────────────────────────────────────
+export const getCategoryRules = () =>
+  api.get('/category-rules').then(r => r.data)
+
+export const createCategoryRule = (data) =>
+  api.post('/category-rules', data).then(r => r.data)
+
+export const deleteCategoryRule = (id) =>
+  api.delete(`/category-rules/${id}`).then(r => r.data)
+
+// ── Smart Categorization ───────────────────────────────────────────────
+export const patchTransaction = (id, data) =>
+  api.patch(`/transactions/${id}`, data).then(r => r.data)
+
+export const autoCategorize = (entityId, onlyUncategorized = true) =>
+  api.post('/transactions/auto-categorize', null, {
+    params: { entity_id: entityId, only_uncategorized: onlyUncategorized }
+  }).then(r => r.data)
+
+export const getRecurringTransactions = (entityId) =>
+  api.get('/transactions/recurring', { params: { entity_id: entityId } }).then(r => r.data)
+
+export const updateCategory = (id, data) =>
+  api.put(`/categories/${id}`, data).then(r => r.data)

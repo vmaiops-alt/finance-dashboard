@@ -1,11 +1,60 @@
-import React, { useState, useEffect } from 'react'
-import { Receipt, Plus, Trash2, Filter, X } from 'lucide-react'
-import { getTransactions, createTransaction, deleteTransaction, getEntities, getAccounts, getCategories } from '../api'
+import React, { useState, useEffect, useRef } from 'react'
+import { Receipt, Plus, Trash2, Filter, Tag, Sparkles, RefreshCw, ChevronDown, X, Check } from 'lucide-react'
+import { getTransactions, createTransaction, deleteTransaction, getEntities, getAccounts, getCategories, patchTransaction, autoCategorize } from '../api'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'AED', 'CHF']
 
 function formatCurrency(amount, currency = 'EUR') {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount)
+}
+
+function CategoryPicker({ categories, currentCategoryId, onSelect, onClose }) {
+  const ref = useRef(null)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  const filtered = categories.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div ref={ref} className="absolute z-50 mt-1 w-56 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden" style={{right: 0}}>
+      <div className="p-2">
+        <input
+          autoFocus
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+          placeholder="Suchen..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="max-h-48 overflow-y-auto">
+        <button
+          onClick={() => onSelect(null)}
+          className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700 flex items-center gap-2 ${!currentCategoryId ? 'bg-gray-700' : ''}`}
+        >
+          <span className="w-2 h-2 rounded-full bg-gray-500"></span>
+          <span className="text-gray-400">Keine Kategorie</span>
+        </button>
+        {filtered.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => onSelect(cat.id)}
+            className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-700 flex items-center gap-2 ${currentCategoryId === cat.id ? 'bg-gray-700' : ''}`}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }}></span>
+            <span>{cat.name}</span>
+            {currentCategoryId === cat.id && <Check className="w-3 h-3 ml-auto text-blue-400" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function Transactions() {
@@ -15,6 +64,8 @@ export default function Transactions() {
   const [categories, setCategories] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [filters, setFilters] = useState({ entity_id: '', tx_type: '', category_id: '' })
+  const [editingCategoryId, setEditingCategoryId] = useState(null)
+  const [autoCategorizingStatus, setAutoCategorizingStatus] = useState(null)
   const [form, setForm] = useState({
     entity_id: '', account_id: '', category_id: '', transaction_type: 'expense',
     amount: '', currency: 'EUR', description: '', counterparty: '',
@@ -66,11 +117,32 @@ export default function Transactions() {
     }
   }
 
+  const handleCategoryChange = async (txId, categoryId) => {
+    setEditingCategoryId(null)
+    await patchTransaction(txId, { category_id: categoryId })
+    load()
+  }
+
+  const handleAutoCategorize = async () => {
+    setAutoCategorizingStatus('running')
+    try {
+      const result = await autoCategorize(filters.entity_id || null, true)
+      setAutoCategorizingStatus(`${result.categorized} von ${result.total_checked} kategorisiert`)
+      load()
+      setTimeout(() => setAutoCategorizingStatus(null), 3000)
+    } catch (err) {
+      setAutoCategorizingStatus('Fehler')
+      setTimeout(() => setAutoCategorizingStatus(null), 3000)
+    }
+  }
+
   const getCategoryName = (id) => categories.find(c => c.id === id)?.name || ''
+  const getCategoryColor = (id) => categories.find(c => c.id === id)?.color || '#6B7280'
   const getEntityName = (id) => entities.find(e => e.id === id)?.name || ''
 
   const totalIncome = transactions.filter(t => t.transaction_type === 'income').reduce((s, t) => s + t.amount, 0)
   const totalExpenses = transactions.filter(t => t.transaction_type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const uncategorizedCount = transactions.filter(t => !t.category_id).length
 
   return (
     <div className="space-y-6">
@@ -85,9 +157,27 @@ export default function Transactions() {
             <span className="text-white font-medium">{formatCurrency(totalIncome - totalExpenses)}</span>
           </p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Neue Transaktion
-        </button>
+        <div className="flex items-center gap-2">
+          {uncategorizedCount > 0 && (
+            <button
+              onClick={handleAutoCategorize}
+              disabled={autoCategorizingStatus === 'running'}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-lg hover:bg-purple-600/30 transition-colors disabled:opacity-50"
+            >
+              <Sparkles className="w-4 h-4" />
+              {autoCategorizingStatus === 'running' ? (
+                <><RefreshCw className="w-3 h-3 animate-spin" /> Kategorisiere...</>
+              ) : autoCategorizingStatus ? (
+                autoCategorizingStatus
+              ) : (
+                `${uncategorizedCount} auto-kategorisieren`
+              )}
+            </button>
+          )}
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Neue Transaktion
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -103,6 +193,7 @@ export default function Transactions() {
         </select>
         <select className="select text-sm" value={filters.category_id} onChange={e => setFilters({ ...filters, category_id: e.target.value })}>
           <option value="">Alle Kategorien</option>
+          <option value="uncategorized">Unkategorisiert</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
@@ -186,12 +277,40 @@ export default function Transactions() {
           <tbody>
             {transactions.map(tx => (
               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                <td className="py-2.5 px-2 text-gray-400">{new Date(tx.transaction_date).toLocaleDateString('de-DE')}</td>
+                <td className="py-2.5 px-2 text-gray-400">
+                  {new Date(tx.transaction_date).toLocaleDateString('de-DE')}
+                  {tx.is_recurring && (
+                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                      <RefreshCw className="w-2.5 h-2.5 mr-0.5" />{tx.recurring_interval}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2.5 px-2">
                   <p className="font-medium">{tx.description || tx.counterparty || '—'}</p>
                   {tx.counterparty && tx.description && <p className="text-xs text-gray-500">{tx.counterparty}</p>}
                 </td>
-                <td className="py-2.5 px-2 text-gray-400">{getCategoryName(tx.category_id) || '—'}</td>
+                <td className="py-2.5 px-2 relative">
+                  <button
+                    onClick={() => setEditingCategoryId(editingCategoryId === tx.id ? null : tx.id)}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs transition-colors ${
+                      tx.category_id
+                        ? 'hover:bg-gray-700'
+                        : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tx.category_id ? getCategoryColor(tx.category_id) : '#EAB308' }}></span>
+                    {tx.category_id ? getCategoryName(tx.category_id) : 'Kategorisieren'}
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </button>
+                  {editingCategoryId === tx.id && (
+                    <CategoryPicker
+                      categories={categories}
+                      currentCategoryId={tx.category_id}
+                      onSelect={(catId) => handleCategoryChange(tx.id, catId)}
+                      onClose={() => setEditingCategoryId(null)}
+                    />
+                  )}
+                </td>
                 <td className="py-2.5 px-2 text-gray-400">{getEntityName(tx.entity_id)}</td>
                 <td className={`py-2.5 px-2 text-right font-semibold ${tx.transaction_type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {tx.transaction_type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}

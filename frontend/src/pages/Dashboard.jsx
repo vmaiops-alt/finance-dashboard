@@ -5,9 +5,9 @@ import {
 } from 'recharts'
 import {
   TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight,
-  Clock, AlertTriangle
+  Clock, AlertTriangle, RefreshCw, Repeat
 } from 'lucide-react'
-import { getDashboardSummary, getMonthlyTrend } from '../api'
+import { getDashboardSummary, getMonthlyTrend, getRecurringTransactions } from '../api'
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1', '#84CC16']
 
@@ -42,6 +42,42 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue' })
           <span>{Math.abs(trend).toFixed(1)}% vs. Vormonat</span>
         </div>
       )}
+      {/* Recurring Payments */}
+      {recurring && recurring.recurring_payments?.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+              <Repeat className="w-4 h-4" />
+              Wiederkehrende Zahlungen
+              <span className="text-xs font-normal text-gray-500">
+                ({recurring.count} erkannt · ~{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(recurring.total_monthly_recurring)}/Monat)
+              </span>
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {recurring.recurring_payments.map((r, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400">
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{r.counterparty}</p>
+                    <p className="text-xs text-gray-500">
+                      {r.interval === 'monthly' ? 'Monatlich' : r.interval === 'weekly' ? 'Wöchentlich' : r.interval === 'yearly' ? 'Jährlich' : r.interval === 'quarterly' ? 'Quartalsweise' : r.interval}
+                      {' · '}{r.occurrences}x erkannt
+                      {r.category && ` · ${r.category}`}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-red-400 font-semibold text-sm">
+                  -{new Intl.NumberFormat('de-DE', { style: 'currency', currency: r.currency }).format(r.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -49,15 +85,18 @@ function StatCard({ title, value, subtitle, icon: Icon, trend, color = 'blue' })
 export default function Dashboard() {
   const [summary, setSummary] = useState(null)
   const [trend, setTrend] = useState([])
+  const [recurring, setRecurring] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       getDashboardSummary(),
       getMonthlyTrend(12),
-    ]).then(([s, t]) => {
+      getRecurringTransactions().catch(() => null),
+    ]).then(([s, t, r]) => {
       setSummary(s)
       setTrend(t)
+      setRecurring(r)
     }).catch(console.error)
       .finally(() => setLoading(false))
   }, [])
@@ -273,6 +312,42 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Recurring Payments */}
+      {recurring && recurring.recurring_payments?.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-400 flex items-center gap-2">
+              <Repeat className="w-4 h-4" />
+              Wiederkehrende Zahlungen
+              <span className="text-xs font-normal text-gray-500">
+                ({recurring.count} erkannt · ~{new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(recurring.total_monthly_recurring)}/Monat)
+              </span>
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {recurring.recurring_payments.map((r, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400">
+                    <RefreshCw className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{r.counterparty}</p>
+                    <p className="text-xs text-gray-500">
+                      {r.interval === 'monthly' ? 'Monatlich' : r.interval === 'weekly' ? 'Wöchentlich' : r.interval === 'yearly' ? 'Jährlich' : r.interval === 'quarterly' ? 'Quartalsweise' : r.interval}
+                      {' · '}{r.occurrences}x erkannt
+                      {r.category && ` · ${r.category}`}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-red-400 font-semibold text-sm">
+                  -{new Intl.NumberFormat('de-DE', { style: 'currency', currency: r.currency }).format(r.amount)}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
