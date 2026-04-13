@@ -23,9 +23,12 @@ DATE_FORMATS = [
 
 # Column name mappings (German + English bank exports)
 COLUMN_MAPPINGS = {
-    "date": ["datum", "date", "buchungstag", "booking date", "valuta", "wertstellung", "transaction date"],
+    "date": ["datum", "date", "buchungstag", "booking date", "valuta", "wertstellung", "transaction date",
+             "startdatum", "started date", "abschlussdatum", "completed date"],
     "amount": ["betrag", "amount", "umsatz", "value", "sum", "summe"],
-    "description": ["verwendungszweck", "description", "buchungstext", "text", "details", "reference", "zahlungsempfänger", "empfänger", "auftraggeber", "beneficiary", "remittance"],
+    "description": ["verwendungszweck", "description", "beschreibung", "buchungstext", "text", "details",
+                     "reference", "zahlungsempfänger", "empfänger", "auftraggeber", "beneficiary", "remittance",
+                     "produkt", "product"],
     "counterparty": ["empfänger", "auftraggeber", "beneficiary", "payee", "payer", "name", "beguenstigter"],
     "type": ["typ", "type", "soll/haben", "debit/credit", "buchungsart"],
     "currency": ["währung", "currency", "ccy"],
@@ -41,10 +44,10 @@ def find_column(df: pd.DataFrame, target: str) -> Optional[str]:
         if candidate in cols_lower:
             return cols_lower[candidate]
 
-    # Fuzzy: check if any candidate is contained in column name
+    # Fuzzy: check if any candidate is contained in column name or vice versa
     for candidate in candidates:
         for col_lower, col_orig in cols_lower.items():
-            if candidate in col_lower:
+            if candidate in col_lower or col_lower in candidate:
                 return col_orig
 
     return None
