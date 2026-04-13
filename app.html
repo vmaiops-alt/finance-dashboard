@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceHQ - Personal Finance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0f;--bg2:#111118;--bg3:#1a1a24;--bg4:#23233a;--border:#2a2a3d;--text:#e4e4ef;--text2:#9595a8;--text3:#5c5c70;--blue:#3b82f6;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--purple:#8b5cf6;--pink:#ec4899}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+input,select,textarea{font-family:inherit}
+.app{display:flex;height:100vh}
+.sidebar{width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{padding:20px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sidebar-header h1 svg{color:var(--blue)}
+.sidebar-header p{font-size:11px;color:var(--text3);margin-top:4px}
+.nav{flex:1;padding:8px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:rgba(59,130,246,.15);color:var(--blue)}
+.main{flex:1;overflow-y:auto;padding:24px}
+.main-inner{max-width:1200px;margin:0 auto}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+.grid{display:grid;gap:16px}.grid-2{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}.grid-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:1024px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}.sidebar{display:none}.main{padding:16px}}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-hover:hover{border-color:var(--bg4);transition:border-color .2s}
+.stat-card .label{font-size:12px;color:var(--text2);margin-bottom:6px}
+.stat-card .value{font-size:24px;font-weight:700}
+.stat-card .sub{font-size:11px;color:var(--text3);margin-top:4px}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-secondary{background:var(--bg3);color:var(--text2)}.btn-secondary:hover{background:var(--bg4)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red)}.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;width:100%;outline:none}
+.input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(59,130,246,.2)}
+select.input{cursor:pointer}
+.label-text{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:4px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(16,185,129,.15);color:var(--green)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-purple{background:rgba(139,92,246,.15);color:var(--purple)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);font-size:12px}
+td{padding:10px 12px;border-bottom:1px solid rgba(42,42,61,.5)}
+tr:hover td{background:rgba(26,26,36,.5)}
+.amount-positive{color:var(--green);font-weight:600}
+.amount-negative{color:var(--red);font-weight:600}
+.entity-badge{padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500}
+.arrow{color:var(--text3);margin:0 8px}
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty svg{width:48px;height:48px;margin:0 auto 12px;opacity:.4}
+.empty p{margin-top:8px;font-size:13px}
+.color-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+.tabs{display:flex;gap:4px;background:var(--bg2);padding:4px;border-radius:8px;width:fit-content;margin-bottom:20px}
+.tab{padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text2)}
+.tab.active{background:var(--bg3);color:var(--text)}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto}
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s}
+.drop-zone:hover,.drop-zone.active{border-color:var(--blue);background:rgba(59,130,246,.05)}
+.section-title{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
+.flex{display:flex}.flex-between{justify-content:space-between}.items-center{align-items:center}.gap-2{gap:8px}.gap-4{gap:16px}.mb-4{margin-bottom:16px}.mt-4{margin-top:16px}
+</style>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#9595a8;font-family:Inter,sans-serif">Lade FinanceHQ...</div></div>
+<script>
+// Load Recharts dynamically then boot app
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.crossOrigin = 'anonymous';
+    s.onload = resolve;
+    s.onerror = () => { console.warn('Failed to load: ' + src); resolve(); };
+    document.head.appendChild(s);
+  });
+}
+loadScript('https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js').then(() => {
+  // Now transform and run the babel script
+  const appScript = document.getElementById('app-babel-code');
+  if (appScript && typeof Babel !== 'undefined') {
+    try {
+      const code = Babel.transform(appScript.textContent, { presets: ['react'] }).code;
+      new Function(code)();
+    } catch(e) { console.error('App boot error:', e); document.getElementById('root').innerHTML = '<div style="padding:40px;color:#ef4444">Error: ' + e.message + '</div>'; }
+  }
+});
+</script>
+<script id="app-babel-code" type="text/plain">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+const RC = window.Recharts || {};
+const AreaChart = RC.AreaChart || 'div';
+const Area = RC.Area || 'div';
+const BarChart = RC.BarChart || 'div';
+const Bar = RC.Bar || 'div';
+const PieChart = RC.PieChart || 'div';
+const Pie = RC.Pie || 'div';
+const Cell = RC.Cell || 'div';
+const LineChart = RC.LineChart || 'div';
+const Line = RC.Line || 'div';
+const XAxis = RC.XAxis || 'div';
+const YAxis = RC.YAxis || 'div';
+const CartesianGrid = RC.CartesianGrid || 'div';
+const Tooltip = RC.Tooltip || 'div';
+const ResponsiveContainer = RC.ResponsiveContainer || (({children, width, height}) => React.createElement('div', {style:{width:width||'100%',height:height||250}}, children));
+const Legend = RC.Legend || 'div';
+const ReferenceLine = RC.ReferenceLine || 'div';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA STORE (in-memory)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316','#6366F1','#84CC16'];
+const CURRENCIES = ['EUR','USD','GBP','AED','CHF'];
+const TRANSFER_TYPES = [
+  {value:'dividend',label:'Dividende'},{value:'salary',label:'Gehalt'},
+  {value:'loan',label:'Darlehen'},{value:'loan_repayment',label:'Rückzahlung'},
+  {value:'management_fee',label:'Management Fee'},{value:'intercompany',label:'Intercompany'},
+  {value:'other',label:'Sonstiges'}
+];
+
+const defaultJurisdictions = [
+  {id:1,name:'Cyprus',code:'CY',corpTax:.125,pit:0,divWht:0,vat:.19,notes:'12.5% Corp Tax. 0% WHT on dividends to non-residents.'},
+  {id:2,name:'UAE / Dubai',code:'AE',corpTax:.09,pit:0,divWht:0,vat:.05,notes:'0% personal income tax. 9% corp tax on profits >375k AED.'},
+  {id:3,name:'Deutschland',code:'DE',corpTax:.30,pit:.42,divWht:.2638,vat:.19,notes:'~30% Corp Tax. 26.38% Abgeltungssteuer on dividends.'},
+  {id:4,name:'Estland',code:'EE',corpTax:0,pit:.20,divWht:.20,vat:.22,notes:'0% on retained profits. 20% on distributions.'},
+  {id:5,name:'UK',code:'GB',corpTax:.25,pit:.45,divWht:0,vat:.20,notes:'25% corp tax on profits >250k.'},
+  {id:6,name:'Schweiz',code:'CH',corpTax:.15,pit:.115,divWht:.35,vat:.081,notes:'~15% eff. Corp Tax (Bund+Kanton). 35% Verrechnungssteuer auf Dividenden (rückforderbar). PIT variiert je Kanton.'},
+  {id:7,name:'BVI',code:'VG',corpTax:0,pit:0,divWht:0,vat:0,notes:'0% Corp Tax, 0% PIT, 0% WHT. Keine MwSt. Klassische Offshore-Jurisdiktion.'},
+  {id:8,name:'Singapur',code:'SG',corpTax:.17,pit:.22,divWht:0,vat:.09,notes:'17% Corp Tax (Teilfreistellungen für erste 300k SGD). 0% WHT auf Dividenden. One-tier system.'},
+  {id:9,name:'Panama',code:'PA',corpTax:.25,pit:.25,divWht:.10,vat:.07,notes:'25% Corp Tax. Territorial system: nur lokales Einkommen besteuert. 10% WHT auf lokale Dividenden, 5% für Aktiengesellschaften.'},
+];
+
+const defaultCategories = [
+  {id:1,name:'Miete & Wohnen',icon:'🏠',color:'#EF4444',kw:['miete','rent','strom','internet']},
+  {id:2,name:'Lebensmittel',icon:'🛒',color:'#F59E0B',kw:['rewe','edeka','lidl','aldi']},
+  {id:3,name:'Transport',icon:'🚗',color:'#3B82F6',kw:['uber','taxi','benzin','bahn','flug']},
+  {id:4,name:'Restaurants',icon:'🍽️',color:'#EC4899',kw:['restaurant','cafe','lieferando']},
+  {id:5,name:'Shopping',icon:'🛍️',color:'#8B5CF6',kw:['amazon','zalando']},
+  {id:6,name:'Gesundheit',icon:'🏥',color:'#10B981',kw:['apotheke','arzt']},
+  {id:7,name:'Versicherungen',icon:'🛡️',color:'#6366F1',kw:['versicherung','insurance']},
+  {id:8,name:'Abos',icon:'📱',color:'#F97316',kw:['netflix','spotify','apple']},
+  {id:9,name:'Software & Tools',icon:'💻',color:'#7C3AED',kw:['saas','hosting','server','cloud']},
+  {id:10,name:'Marketing',icon:'📢',color:'#E11D48',kw:['ads','werbung','marketing']},
+  {id:11,name:'Gehalt',icon:'💰',color:'#22C55E',kw:['gehalt','salary','lohn']},
+  {id:12,name:'Freelance',icon:'💼',color:'#0EA5E9',kw:['invoice','rechnung','beratung']},
+  {id:13,name:'Dividende',icon:'📈',color:'#A3E635',kw:['dividend','dividende']},
+  {id:14,name:'Steuern',icon:'🏛️',color:'#DC2626',kw:['steuer','tax','finanzamt']},
+  {id:15,name:'Sonstiges',icon:'📋',color:'#6B7280',kw:[]},
+];
+
+const defaultTaxRules = [
+  {id:1,jId:1,type:'dividend',rate:0,desc:'No WHT on dividends to non-residents'},
+  {id:2,jId:1,type:'salary',rate:0,desc:'No PIT for non-domiciled'},
+  {id:3,jId:2,type:'dividend',rate:0,desc:'No WHT on dividends'},
+  {id:4,jId:2,type:'salary',rate:0,desc:'No personal income tax'},
+  {id:5,jId:3,type:'dividend',rate:.2638,desc:'Abgeltungssteuer 26.38%'},
+  {id:6,jId:3,type:'salary',rate:.42,desc:'Top marginal rate 42%'},
+  {id:7,jId:6,type:'dividend',rate:.35,desc:'35% Verrechnungssteuer (rückforderbar bei DBA)'},
+  {id:8,jId:6,type:'salary',rate:.115,desc:'Direkte Bundessteuer max. 11.5%, zzgl. Kantonssteuer'},
+  {id:9,jId:6,type:'management_fee',rate:.15,desc:'WHT auf Management Fees an Ausland ~15% (DBA-abhängig)'},
+  {id:10,jId:7,type:'dividend',rate:0,desc:'No WHT on dividends'},
+  {id:11,jId:7,type:'salary',rate:0,desc:'No personal income tax'},
+  {id:12,jId:7,type:'management_fee',rate:0,desc:'No withholding on fees'},
+  {id:13,jId:8,type:'dividend',rate:0,desc:'No WHT on dividends (one-tier system)'},
+  {id:14,jId:8,type:'salary',rate:.22,desc:'Top marginal rate 22% über 320k SGD'},
+  {id:15,jId:8,type:'management_fee',rate:.17,desc:'WHT on management fees to non-residents 17%'},
+  {id:16,jId:9,type:'dividend',rate:.10,desc:'10% WHT auf Dividenden (5% für SA)'},
+  {id:17,jId:9,type:'salary',rate:0,desc:'Foreign-source income steuerfrei (Territorial)'},
+  {id:18,jId:9,type:'management_fee',rate:.125,desc:'12.5% WHT auf Fees an Ausland'},
+];
+
+function createStore() {
+  let _id = 100;
+  const nextId = () => ++_id;
+  return {
+    jurisdictions: [...defaultJurisdictions],
+    categories: [...defaultCategories],
+    taxRules: [...defaultTaxRules],
+    entities: [],
+    accounts: [],
+    transactions: [],
+    transfers: [],
+    loans: [],
+    budgets: [],
+    nextId
+  };
+}
+
+function fmt(amount, currency='EUR') {
+  return new Intl.NumberFormat('de-DE',{style:'currency',currency,minimumFractionDigits:0,maximumFractionDigits:0}).format(amount);
+}
+function fmtFull(amount, currency='EUR') {
+  return new Intl.NumberFormat('de-DE',{style:'currency',currency}).format(amount);
+}
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('de-DE');
+}
+function fmtPct(r) { return (r*100).toFixed(1)+'%'; }
+
+// Tax Engine
+function computeTransferTax(store, fromId, toId, type, amount) {
+  const from = store.entities.find(e=>e.id===fromId);
+  const to = store.entities.find(e=>e.id===toId);
+  if(!from||!to) return {rate:0,tax:0,net:amount};
+  const rule = store.taxRules.find(r=>r.jId===from.jId&&r.type===type);
+  let rate = rule ? rule.rate : 0;
+  if(!rule && from.jId) {
+    const j = store.jurisdictions.find(jj=>jj.id===from.jId);
+    if(j) {
+      if(type==='dividend') rate=j.divWht;
+      else if(type==='salary' && to.jId) { const tj=store.jurisdictions.find(jj=>jj.id===to.jId); rate=tj?tj.pit:0; }
+      else if(type==='management_fee') rate=j.corpTax;
+    }
+  }
+  if(type==='dividend' && to.jId) {
+    const recRule = store.taxRules.find(r=>r.jId===to.jId&&r.type==='dividend');
+    if(recRule) rate = Math.max(rate, recRule.rate);
+  }
+  const tax = Math.round(amount*rate*100)/100;
+  return {rate, tax, net: amount-tax};
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SVG ICONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const Icon = ({name, size=18}) => {
+  const icons = {
+    dashboard: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>,
+    wallet: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>,
+    receipt: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>,
+    building: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>,
+    transfer: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>,
+    globe: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>,
+    trending: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+    upload: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+    settings: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+    plus: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+    trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+    edit: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
+    arrowRight: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+    alert: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>,
+    creditcard: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>,
+    user: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+    x: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+    simulate: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>,
+    copy: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
+  };
+  return icons[name] || null;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════════════
+
+function App() {
+  const [store, setStore] = useState(createStore);
+  const [page, setPage] = useState('dashboard');
+  const update = (fn) => setStore(s => { const ns = {...s}; fn(ns); return ns; });
+
+  const navItems = [
+    {id:'dashboard',icon:'dashboard',label:'Dashboard'},
+    {id:'accounts',icon:'creditcard',label:'Konten'},
+    {id:'transactions',icon:'receipt',label:'Transaktionen'},
+    {id:'companies',icon:'building',label:'Firmen'},
+    {id:'transfers',icon:'transfer',label:'Transfers'},
+    {id:'tax',icon:'globe',label:'Steuern'},
+    {id:'runway',icon:'trending',label:'Runway'},
+    {id:'simulation',icon:'simulate',label:'Simulation'},
+    {id:'import',icon:'upload',label:'Import'},
+    {id:'settings',icon:'settings',label:'Einstellungen'},
+  ];
+
+  const pages = {
+    dashboard: <DashboardPage store={store} />,
+    accounts: <AccountsPage store={store} update={update} />,
+    transactions: <TransactionsPage store={store} update={update} />,
+    companies: <CompaniesPage store={store} update={update} />,
+    transfers: <TransfersPage store={store} update={update} />,
+    tax: <TaxPage store={store} />,
+    runway: <RunwayPage store={store} />,
+    simulation: <SimulationPage store={store} />,
+    import: <ImportPage store={store} update={update} />,
+    settings: <SettingsPage store={store} update={update} />,
+  };
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1><Icon name="wallet" size={22}/>FinanceHQ</h1>
+          <p>Personal Finance Dashboard</p>
+        </div>
+        <nav className="nav">
+          {navItems.map(n=>(
+            <button key={n.id} className={`nav-item ${page===n.id?'active':''}`} onClick={()=>setPage(n.id)}>
+              <Icon name={n.icon}/>{n.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)',fontSize:'11px',color:'var(--text3)'}}>
+          FinanceHQ v1.0 — In-Memory
+        </div>
+      </aside>
+      <main className="main">
+        <div className="main-inner">{pages[page]}</div>
+      </main>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function DashboardPage({store}) {
+  const now = new Date();
+  const curMonth = now.getMonth();
+  const curYear = now.getFullYear();
+  const monthTxs = store.transactions.filter(t=>{const d=new Date(t.date);return d.getMonth()===curMonth&&d.getFullYear()===curYear;});
+  const income = monthTxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expenses = monthTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const totalBalance = store.accounts.reduce((s,a)=>s+a.balance,0);
+
+  // Expense by category
+  const catMap = {};
+  monthTxs.filter(t=>t.type==='expense').forEach(t=>{
+    const cat = store.categories.find(c=>c.id===t.catId);
+    const name = cat ? cat.name : 'Sonstiges';
+    catMap[name] = (catMap[name]||0)+t.amount;
+  });
+  const pieData = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value],i)=>({name,value,color:COLORS[i%COLORS.length]}));
+
+  // Monthly trend (last 12 months)
+  const trend = [];
+  for(let i=11;i>=0;i--){
+    const d=new Date(curYear,curMonth-i,1);
+    const m=d.getMonth(),y=d.getFullYear();
+    const mtxs=store.transactions.filter(t=>{const td=new Date(t.date);return td.getMonth()===m&&td.getFullYear()===y;});
+    trend.push({
+      label:d.toLocaleDateString('de-DE',{month:'short',year:'2-digit'}),
+      income:mtxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
+      expenses:mtxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
+    });
+  }
+
+  // Avg burn for runway
+  const last6 = trend.slice(-7,-1);
+  const avgExp = last6.reduce((s,m)=>s+m.expenses,0)/(last6.length||1);
+  const avgInc = last6.reduce((s,m)=>s+m.income,0)/(last6.length||1);
+  const netBurn = avgExp-avgInc;
+  const runway = netBurn>0 ? totalBalance/netBurn : 999;
+
+  return (
+    <div>
+      <h1 className="page-title">Dashboard</h1>
+      <p className="page-sub">{now.toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</p>
+
+      <div className="grid grid-4 mb-4">
+        <div className="card stat-card">
+          <div className="label">Gesamtvermögen</div>
+          <div className="value" style={{color:'var(--blue)'}}>{fmt(totalBalance)}</div>
+          <div className="sub">{store.accounts.length} Konten</div>
+        </div>
+        <div className="card stat-card">
+          <div className="label">Einnahmen (Monat)</div>
+          <div className="value amount-positive">{fmt(income)}</div>
+        </div>
+        <div className="card stat-card">
+          <div className="label">Ausgaben (Monat)</div>
+          <div className="value amount-negative">{fmt(expenses)}</div>
+        </div>
+        <div className="card stat-card">
+          <div className="label">Runway</div>
+          <div className="value" style={{color:runway<6?'var(--red)':runway<12?'var(--yellow)':'var(--green)'}}>
+            {runway>=999?'∞':`${Math.round(runway)} Mon.`}
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:16,marginBottom:16}}>
+        <div className="card">
+          <div className="section-title">Einnahmen vs. Ausgaben</div>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={trend}>
+              <defs>
+                <linearGradient id="gi" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10B981" stopOpacity={.3}/><stop offset="95%" stopColor="#10B981" stopOpacity={0}/></linearGradient>
+                <linearGradient id="ge" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#EF4444" stopOpacity={.3}/><stop offset="95%" stopColor="#EF4444" stopOpacity={0}/></linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1F2937"/>
+              <XAxis dataKey="label" tick={{fill:'#6B7280',fontSize:11}}/>
+              <YAxis tick={{fill:'#6B7280',fontSize:11}} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+              <Tooltip contentStyle={{background:'#111118',border:'1px solid #2a2a3d',borderRadius:8}} formatter={v=>fmt(v)}/>
+              <Area type="monotone" dataKey="income" stroke="#10B981" fill="url(#gi)" name="Einnahmen"/>
+              <Area type="monotone" dataKey="expenses" stroke="#EF4444" fill="url(#ge)" name="Ausgaben"/>
+              <Legend/>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="card">
+          <div className="section-title">Top Ausgaben</div>
+          {pieData.length>0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={2}>
+                  {pieData.map((e,i)=><Cell key={i} fill={e.color}/>)}
+                </Pie><Tooltip contentStyle={{background:'#111118',border:'1px solid #2a2a3d',borderRadius:8}} formatter={v=>fmt(v)}/></PieChart>
+              </ResponsiveContainer>
+              <div>{pieData.slice(0,5).map((p,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontSize:12}}>
+                  <span style={{display:'flex',alignItems:'center',gap:6}}><span className="color-dot" style={{background:p.color}}/>{p.name}</span>
+                  <span style={{color:'var(--text2)'}}>{fmt(p.value)}</span>
+                </div>
+              ))}</div>
+            </>
+          ) : <div className="empty" style={{padding:30}}><p>Keine Ausgaben</p></div>}
+        </div>
+      </div>
+
+      <div className="grid grid-2">
+        <div className="card">
+          <div className="section-title">Konten</div>
+          {store.accounts.length>0 ? store.accounts.map(a=>{
+            const e=store.entities.find(en=>en.id===a.entityId);
+            return <div key={a.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+              <div><div style={{fontWeight:500,fontSize:13}}>{a.name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{a.bank} · {e?.name||''}</div></div>
+              <span style={{fontWeight:600,color:a.balance>=0?'var(--green)':'var(--red)'}}>{fmtFull(a.balance,a.currency)}</span>
+            </div>;
+          }) : <div className="empty" style={{padding:20}}><p>Noch keine Konten</p></div>}
+        </div>
+        <div className="card">
+          <div className="section-title">Letzte Transaktionen</div>
+          {store.transactions.length>0 ? [...store.transactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8).map(tx=>{
+            const cat=store.categories.find(c=>c.id===tx.catId);
+            return <div key={tx.id} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid rgba(42,42,61,.3)'}}>
+              <div><div style={{fontWeight:500,fontSize:13}}>{tx.description||tx.counterparty||'—'}</div><div style={{fontSize:11,color:'var(--text3)'}}>{fmtDate(tx.date)} · {cat?.name||''}</div></div>
+              <span className={tx.type==='income'?'amount-positive':'amount-negative'} style={{fontSize:13}}>{tx.type==='income'?'+':'-'}{fmt(tx.amount)}</span>
+            </div>;
+          }) : <div className="empty" style={{padding:20}}><p>Noch keine Transaktionen</p></div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACCOUNTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function AccountsPage({store, update}) {
+  const [show,setShow]=useState(false);
+  const [form,setForm]=useState({name:'',bank:'',entityId:'',currency:'EUR',balance:0});
+
+  const submit = (e) => {
+    e.preventDefault();
+    update(s=>{
+      s.accounts=[...s.accounts,{id:s.nextId(),name:form.name,bank:form.bank,entityId:+form.entityId,currency:form.currency,balance:+form.balance}];
+    });
+    setShow(false);setForm({name:'',bank:'',entityId:'',currency:'EUR',balance:0});
+  };
+  const del=(id)=>update(s=>{s.accounts=s.accounts.filter(a=>a.id!==id);});
+
+  const total=store.accounts.reduce((s,a)=>s+a.balance,0);
+  const grouped=store.entities.map(e=>({e,accs:store.accounts.filter(a=>a.entityId===e.id)})).filter(g=>g.accs.length>0);
+
+  return (
+    <div>
+      <div className="flex flex-between items-center mb-4">
+        <div><h1 className="page-title">Konten</h1><p className="page-sub">Gesamt: {fmtFull(total)}</p></div>
+        <button className="btn btn-primary" onClick={()=>setShow(!show)}><Icon name="plus" size={14}/>Konto hinzufügen</button>
+      </div>
+      {show && <form onSubmit={submit} className="card mb-4">
+        <div className="form-row">
+          <div><span className="label-text">Name</span><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></div>
+          <div><span className="label-text">Bank</span><input className="input" value={form.bank} onChange={e=>setForm({...form,bank:e.target.value})}/></div>
+          <div><span className="label-text">Zugehörigkeit</span><select className="input" value={form.entityId} onChange={e=>setForm({...form,entityId:e.target.value})} required>
+            <option value="">Wählen...</option>{store.entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+          </select></div>
+          <div><span className="label-text">Währung</span><select className="input" value={form.currency} onChange={e=>setForm({...form,currency:e.target.value})}>
+            {CURRENCIES.map(c=><option key={c}>{c}</option>)}
+          </select></div>
+          <div><span className="label-text">Kontostand</span><input type="number" step="0.01" className="input" value={form.balance} onChange={e=>setForm({...form,balance:e.target.value})}/></div>
+        </div>
+        <div className="flex gap-2"><button type="submit" className="btn btn-primary">Erstellen</button><button type="button" className="btn btn-secondary" onClick={()=>setShow(false)}>Abbrechen</button></div>
+      </form>}
+      {grouped.map(g=>(
+        <div key={g.e.id} style={{marginBottom:20}}>
+          <div className="flex items-center gap-2 mb-4"><span className="color-dot" style={{background:g.e.color}}/><span style={{fontWeight:600}}>{g.e.name}</span><span style={{fontSize:12,color:'var(--text3)'}}>({g.e.type==='company'?'Firma':'Privat'})</span>
+          <span style={{marginLeft:'auto',fontSize:13,fontWeight:500}}>{fmtFull(g.accs.reduce((s,a)=>s+a.balance,0))}</span></div>
+          <div className="grid grid-3">{g.accs.map(a=>(
+            <div key={a.id} className="card card-hover">
+              <div className="flex flex-between"><div><div style={{fontWeight:500}}>{a.name}</div><div style={{fontSize:12,color:'var(--text3)'}}>{a.bank}</div></div>
+              <button className="btn btn-sm btn-danger" onClick={()=>del(a.id)}><Icon name="trash" size={12}/></button></div>
+              <div style={{fontSize:22,fontWeight:700,marginTop:12,color:a.balance>=0?'var(--green)':'var(--red)'}}>{fmtFull(a.balance,a.currency)}</div>
+            </div>
+          ))}</div>
+        </div>
+      ))}
+      {store.accounts.length===0&&!show&&<div className="empty"><Icon name="creditcard" size={48}/><p>Noch keine Konten. Füge zuerst Firmen/Personen hinzu.</p></div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSACTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TransactionsPage({store, update}) {
+  const [show,setShow]=useState(false);
+  const [filter,setFilter]=useState({entity:'',type:'',cat:''});
+  const [form,setForm]=useState({entityId:'',accountId:'',catId:'',type:'expense',amount:'',currency:'EUR',desc:'',counterparty:'',date:new Date().toISOString().split('T')[0]});
+
+  const submit = (e) => {
+    e.preventDefault();
+    const tx = {id:store.nextId(),entityId:+form.entityId,accountId:form.accountId?+form.accountId:null,catId:form.catId?+form.catId:null,type:form.type,amount:+form.amount,currency:form.currency,description:form.desc,counterparty:form.counterparty,date:form.date};
+    update(s=>{
+      s.transactions=[...s.transactions,tx];
+      if(tx.accountId){const acc=s.accounts.find(a=>a.id===tx.accountId);if(acc){acc.balance+=tx.type==='income'?tx.amount:-tx.amount;}}
+    });
+    setShow(false);setForm({entityId:'',accountId:'',catId:'',type:'expense',amount:'',currency:'EUR',desc:'',counterparty:'',date:new Date().toISOString().split('T')[0]});
+  };
+  const del=(id)=>update(s=>{
+    const tx=s.transactions.find(t=>t.id===id);
+    if(tx&&tx.accountId){const acc=s.accounts.find(a=>a.id===tx.accountId);if(acc){acc.balance+=tx.type==='income'?-tx.amount:tx.amount;}}
+    s.transactions=s.transactions.filter(t=>t.id!==id);
+  });
+
+  let txs=[...store.transactions];
+  if(filter.entity)txs=txs.filter(t=>t.entityId===+filter.entity);
+  if(filter.type)txs=txs.filter(t=>t.type===filter.type);
+  if(filter.cat)txs=txs.filter(t=>t.catId===+filter.cat);
+  txs.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  return (
+    <div>
+      <div className="flex flex-between items-center mb-4">
+        <div><h1 className="page-title">Transaktionen</h1></div>
+        <button className="btn btn-primary" onClick={()=>setShow(!show)}><Icon name="plus" size={14}/>Neue Transaktion</button>
+      </div>
+      <div className="flex gap-2 mb-4">
+        <select className="input" style={{width:180}} value={filter.entity} onChange={e=>setFilter({...filter,entity:e.target.value})}><option value="">Alle Entitäten</option>{store.entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select>
+        <select className="input" style={{width:150}} value={filter.type} onChange={e=>setFilter({...filter,type:e.target.value})}><option value="">Alle Typen</option><option value="income">Einnahmen</option><option value="expense">Ausgaben</option></select>
+        <select className="input" style={{width:180}} value={filter.cat} onChange={e=>setFilter({...filter,cat:e.target.value})}><option value="">Alle Kategorien</option>{store.categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
+      </div>
+      {show && <form onSubmit={submit} className="card mb-4">
+        <div className="form-row">
+          <div><span className="label-text">Typ</span><select className="input" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="expense">Ausgabe</option><option value="income">Einnahme</option></select></div>
+          <div><span className="label-text">Betrag</span><input type="number" step="0.01" className="input" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} required/></div>
+          <div><span className="label-text">Datum</span><input type="date" className="input" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required/></div>
+          <div><span className="label-text">Entität</span><select className="input" value={form.entityId} onChange={e=>setForm({...form,entityId:e.target.value})} required><option value="">Wählen...</option>{store.entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div><span className="label-text">Konto</span><select className="input" value={form.accountId} onChange={e=>setForm({...form,accountId:e.target.value})}><option value="">Optional</option>{store.accounts.filter(a=>!form.entityId||a.entityId===+form.entityId).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
+          <div><span className="label-text">Kategorie</span><select className="input" value={form.catId} onChange={e=>setForm({...form,catId:e.target.value})}><option value="">Wählen...</option>{store.categories.map(c=><option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}</select></div>
+          <div><span className="label-text">Beschreibung</span><input className="input" value={form.desc} onChange={e=>setForm({...form,desc:e.target.value})}/></div>
+          <div><span className="label-text">Empfänger</span><input className="input" value={form.counterparty} onChange={e=>setForm({...form,counterparty:e.target.value})}/></div>
+        </div>
+        <div className="flex gap-2"><button type="submit" className="btn btn-primary">Speichern</button><button type="button" className="btn btn-secondary" onClick={()=>setShow(false)}>Abbrechen</button></div>
+      </form>}
+      <div className="card">
+        <table><thead><tr><th>Datum</th><th>Beschreibung</th><th>Kategorie</th><th>Entität</th><th style={{textAlign:'right'}}>Betrag</th><th></th></tr></thead>
+        <tbody>{txs.map(tx=>{const cat=store.categories.find(c=>c.id===tx.catId);const ent=store.entities.find(e=>e.id===tx.entityId);return(
+          <tr key={tx.id}><td style={{color:'var(--text2)'}}>{fmtDate(tx.date)}</td><td>{tx.description||tx.counterparty||'—'}</td><td style={{color:'var(--text2)'}}>{cat?`${cat.icon} ${cat.name}`:'—'}</td><td style={{color:'var(--text2)'}}>{ent?.name||'—'}</td>
+          <td className={tx.type==='income'?'amount-positive':'amount-negative'} style={{textAlign:'right'}}>{tx.type==='income'?'+':'-'}{fmtFull(tx.amount,tx.currency)}</td>
+          <td style={{textAlign:'right'}}><button className="btn btn-sm" style={{background:'none',padding:4}} onClick={()=>del(tx.id)}><Icon name="trash" size={14}/></button></td></tr>
+        );})}</tbody></table>
+        {txs.length===0&&<div className="empty" style={{padding:30}}><p>Keine Transaktionen</p></div>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPANIES & PERSONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function CompaniesPage({store, update}) {
+  const [show,setShow]=useState(false);
+  const [form,setForm]=useState({name:'',type:'company',jId:'',currency:'EUR',notes:'',color:'#3B82F6'});
+
+  const submit=(e)=>{
+    e.preventDefault();
+    update(s=>{s.entities=[...s.entities,{id:s.nextId(),name:form.name,type:form.type,jId:form.jId?+form.jId:null,currency:form.currency,notes:form.notes,color:form.color}];});
+    setShow(false);setForm({name:'',type:'company',jId:'',currency:'EUR',notes:'',color:COLORS[store.entities.length%COLORS.length]});
+  };
+  const del=(id)=>update(s=>{s.entities=s.entities.filter(e=>e.id!==id);s.accounts=s.accounts.filter(a=>a.entityId!==id);});
+
+  const companies=store.entities.filter(e=>e.type==='company');
+  const personal=store.entities.filter(e=>e.type==='personal');
+
+  return (
+    <div>
+      <div className="flex flex-between items-center mb-4">
+        <div><h1 className="page-title">Firmen & Personen</h1><p className="page-sub">{companies.length} Firmen, {personal.length} Privat</p></div>
+        <button className="btn btn-primary" onClick={()=>{setShow(true);setForm({name:'',type:'company',jId:'',currency:'EUR',notes:'',color:COLORS[store.entities.length%COLORS.length]});}}><Icon name="plus" size={14}/>Hinzufügen</button>
+      </div>
+      {show && <form onSubmit={submit} className="card mb-4">
+        <div className="form-row">
+          <div><span className="label-text">Name</span><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="z.B. Cyprus Trading Ltd" required/></div>
+          <div><span className="label-text">Typ</span><select className="input" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="company">Firma</option><option value="personal">Privat</option></select></div>
+          <div><span className="label-text">Jurisdiktion</span><select className="input" value={form.jId} onChange={e=>setForm({...form,jId:e.target.value})}>
+            <option value="">Keine</option>{store.jurisdictions.map(j=><option key={j.id} value={j.id}>{j.name} ({fmtPct(j.corpTax)} Corp Tax)</option>)}
+          </select></div>
+          <div><span className="label-text">Währung</span><select className="input" value={form.currency} onChange={e=>setForm({...form,currency:e.target.value})}>{CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+          <div><span className="label-text">Farbe</span><div className="flex gap-2" style={{marginTop:4}}>{COLORS.slice(0,8).map(c=>(
+            <div key={c} onClick={()=>setForm({...form,color:c})} style={{width:28,height:28,borderRadius:6,background:c,cursor:'pointer',border:form.color===c?'2px solid #fff':'2px solid transparent'}}/>
+          ))}</div></div>
+          <div><span className="label-text">Notizen</span><input className="input" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/></div>
+        </div>
+        <div className="flex gap-2"><button type="submit" className="btn btn-primary">Erstellen</button><button type="button" className="btn btn-secondary" onClick={()=>setShow(false)}>Abbrechen</button></div>
+      </form>}
+
+      {companies.length>0&&<div style={{marginBottom:24}}><div className="section-title flex items-center gap-2"><Icon name="building"/>Firmen</div>
+        <div className="grid grid-3">{companies.map(e=>{const j=store.jurisdictions.find(jj=>jj.id===e.jId);return(
+          <div key={e.id} className="card card-hover"><div className="flex flex-between items-center">
+            <div className="flex items-center gap-2"><div style={{width:36,height:36,borderRadius:8,background:e.color+'20',display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="building" size={16}/></div>
+            <div><div style={{fontWeight:600}}>{e.name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{j?.name||'—'} · {e.currency}</div></div></div>
+            <button className="btn btn-sm btn-danger" onClick={()=>del(e.id)}><Icon name="trash" size={12}/></button>
+          </div>{e.notes&&<div style={{fontSize:12,color:'var(--text3)',marginTop:8}}>{e.notes}</div>}</div>
+        );})}</div></div>}
+
+      {personal.length>0&&<div><div className="section-title flex items-center gap-2"><Icon name="user"/>Privat</div>
+        <div className="grid grid-3">{personal.map(e=>{const j=store.jurisdictions.find(jj=>jj.id===e.jId);return(
+          <div key={e.id} className="card card-hover"><div className="flex flex-between items-center">
+            <div className="flex items-center gap-2"><div style={{width:36,height:36,borderRadius:8,background:e.color+'20',display:'flex',alignItems:'center',justifyContent:'center'}}><Icon name="user" size={16}/></div>
+            <div><div style={{fontWeight:600}}>{e.name}</div><div style={{fontSize:11,color:'var(--text3)'}}>{j?.name||'—'} · {e.currency}</div></div></div>
+            <button className="btn btn-sm btn-danger" onClick={()=>del(e.id)}><Icon name="trash" size={12}/></button>
+          </div></div>
+        );})}</div></div>}
+
+      {store.entities.length===0&&!show&&<div className="empty"><Icon name="building" size={48}/><p>Noch keine Firmen. Starte mit dem Hinzufügen deiner Firmen und Privat-Profil.</p></div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TRANSFERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TransfersPage({store, update}) {
+  const [show,setShow]=useState(false);
+  const [form,setForm]=useState({fromId:'',toId:'',fromAccId:'',toAccId:'',type:'dividend',amount:'',currency:'EUR',date:new Date().toISOString().split('T')[0],desc:''});
+  const [preview,setPreview]=useState(null);
+
+  const previewTax = () => {
+    if(form.fromId&&form.toId&&form.amount){
+      const r=computeTransferTax(store,+form.fromId,+form.toId,form.type,+form.amount);
+      setPreview(r);
+    }
+  };
+  useEffect(()=>{previewTax()},[form.fromId,form.toId,form.type,form.amount]);
+
+  const submit=(e)=>{
+    e.preventDefault();
+    const tax=computeTransferTax(store,+form.fromId,+form.toId,form.type,+form.amount);
+    update(s=>{
+      s.transfers=[...s.transfers,{id:s.nextId(),fromId:+form.fromId,toId:+form.toId,fromAccId:form.fromAccId?+form.fromAccId:null,toAccId:form.toAccId?+form.toAccId:null,type:form.type,amount:+form.amount,currency:form.currency,date:form.date,desc:form.desc,...tax}];
+      if(form.fromAccId){const a=s.accounts.find(aa=>aa.id===+form.fromAccId);if(a)a.balance-=+form.amount;}
+      if(form.toAccId){const a=s.accounts.find(aa=>aa.id===+form.toAccId);if(a)a.balance+=tax.net;}
+    });
+    setShow(false);setForm({fromId:'',toId:'',fromAccId:'',toAccId:'',type:'dividend',amount:'',currency:'EUR',date:new Date().toISOString().split('T')[0],desc:''});
+  };
+  const del=(id)=>update(s=>{s.transfers=s.transfers.filter(t=>t.id!==id);});
+
+  const totalTax=store.transfers.reduce((s,t)=>s+t.tax,0);
+
+  return (
+    <div>
+      <div className="flex flex-between items-center mb-4">
+        <div><h1 className="page-title">Transfers</h1><p className="page-sub">Gesamt-Steuern: <span style={{color:'var(--red)'}}>{fmtFull(totalTax)}</span></p></div>
+        <button className="btn btn-primary" onClick={()=>setShow(!show)}><Icon name="plus" size={14}/>Neuer Transfer</button>
+      </div>
+      {show && <form onSubmit={submit} className="card mb-4">
+        <div style={{fontWeight:600,marginBottom:12}}>Neuer Transfer</div>
+        <div className="form-row">
+          <div><span className="label-text">Von</span><select className="input" value={form.fromId} onChange={e=>setForm({...form,fromId:e.target.value})} required><option value="">Wählen...</option>{store.entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div><span className="label-text">An</span><select className="input" value={form.toId} onChange={e=>setForm({...form,toId:e.target.value})} required><option value="">Wählen...</option>{store.entities.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></div>
+          <div><span className="label-text">Typ</span><select className="input" value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>{TRANSFER_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+          <div><span className="label-text">Betrag</span><input type="number" step="0.01" className="input" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} required/></div>
+          <div><span className="label-text">Datum</span><input type="date" className="input" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required/></div>
+          <div><span className="label-text">Von Konto</span><select className="input" value={form.fromAccId} onChange={e=>setForm({...form,fromAccId:e.target.value})}><option value="">Optional</option>{store.accounts.filter(a=>!form.fromId||a.entityId===+form.fromId).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
+          <div><span className="label-text">An Konto</span><select className="input" value={form.toAccId} onChange={e=>setForm({...form,toAccId:e.target.value})}><option value="">Optional</option>{store.accounts.filter(a=>!form.toId||a.entityId===+form.toId).map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div>
+          <div><span className="label-text">Beschreibung</span><input className="input" value={form.desc} onChange={e=>setForm({...form,desc:e.target.value})}/></div>
+        </div>
+        {preview&&form.amount&&<div style={{background:'var(--bg3)',padding:12,borderRadius:8,marginBottom:12,fontSize:13}}>
+          Steuer: <span style={{color:preview.tax>0?'var(--red)':'var(--green)',fontWeight:600}}>{fmtPct(preview.rate)} = {fmtFull(preview.tax)}</span> → Netto: <span style={{fontWeight:600,color:'var(--green)'}}>{fmtFull(preview.net)}</span>
+        </div>}
+        <div className="flex gap-2"><button type="submit" className="btn btn-primary">Transfer erstellen</button><button type="button" className="btn btn-secondary" onClick={()=>setShow(false)}>Abbrechen</button></div>
+      </form>}
+
+      <div style={{display:'flex',flexDirection:'column',gap:12}}>
+        {[...store.transfers].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>{
+          const from=store.entities.find(e=>e.id===t.fromId);
+          const to=store.entities.find(e=>e.id===t.toId);
+          const tl=TRANSFER_TYPES.find(tt=>tt.value===t.type);
+          return <div key={t.id} className="card card-hover">
+            <div className="flex flex-between items-center">
+              <div className="flex items-center gap-2" style={{flexWrap:'wrap'}}>
+                <span className="entity-badge" style={{background:(from?.color||'#666')+'20',color:from?.color||'#666'}}>{from?.name||'?'}</span>
+                <Icon name="arrowRight" size={14}/>
+                <span className="entity-badge" style={{background:(to?.color||'#666')+'20',color:to?.color||'#666'}}>{to?.name||'?'}</span>
+                <span className="badge badge-blue">{tl?.label||t.type}</span>
+                <span style={{fontSize:12,color:'var(--text3)'}}>{fmtDate(t.date)}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontWeight:600}}>{fmtFull(t.amount,t.currency)}</div>
+                  <div style={{fontSize:11,color:t.tax>0?'var(--red)':'var(--green)'}}>{t.tax>0?`Steuer: ${fmtFull(t.tax)} (${fmtPct(t.rate)}) → Netto: ${fmtFull(t.net)}`:'Steuerfrei'}</div>
+                </div>
+                <button className="btn btn-sm" style={{background:'none'}} onClick={()=>del(t.id)}><Icon name="trash" size={14}/></button>
+              </div>
+            </div>
+            {t.desc&&<div style={{fontSize:12,color:'var(--text3)',marginTop:6}}>{t.desc}</div>}
+          </div>;
+        })}
+      </div>
+      {store.transfers.length===0&&!show&&<div className="empty"><Icon name="transfer" size={48}/><p>Noch keine Transfers. Erstelle Dividenden, Gehälter, Loans zwischen Firmen & Privat.</p></div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAX OVERVIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
+function TaxPage({store}) {
+  const year = new Date().getFullYear();
+  const overview = store.entities.map(entity => {
+    const txs = store.transactions.filter(t=>t.entityId===entity.id&&new Date(t.date).getFullYear()===year);
+    const revenue = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const expenses = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const profit = revenue-expenses;
+    const j = store.jurisdictions.find(jj=>jj.id===entity.jId);
+    const corpRate = j ? j.corpTax : 0;
+    const corpTax = Math.max(0,profit)*corpRate;
+    const transfers = store.transfers.filter(t=>(t.fromId===entity.id||t.toId===entity.id)&&new Date(t.date).getFullYear()===year);
+    const transferTax = transfers.filter(t=>t.fromId===entity.id).reduce((s,t)=>s+t.tax,0);
+    const divPaid = transfers.filter(t=>t.fromId===entity.id&&t.type==='dividend').reduce((s,t)=>s+t.amount,0);
+    const divReceived = transfers.filter(t=>t.toId===entity.id&&t.type==='dividend').reduce((s,t)=>s+t.net,0);
+    return {entity,j,revenue,expenses,profit,corpRate,corpTax,netProfit:profit-corpTax,transferTax,divPaid,divReceived,totalTax:corpTax+transferTax};
+  });
+  const totalTax = overview.reduce((s,o)=>s+o.totalTax,0);
+  const totalProfit = overview.reduce((s,o)=>s+o.profit,0);
+  const effectiveRate = totalProfit>0?(totalTax/totalProfit):0;
+
+  const chartData = overview.filter(o=>o.revenue>0||o.expenses>0).map(o=>({name:o.entity.name,Umsatz:o.revenue,Gewinn:o.profit,Steuern:o.totalTax}));
+
+  return (
+    <div>
+      <h1 className="page-title">Steuerübersicht {year}</h1>
+      <p className="page-sub">Effektive Steuerbelastung: <span style={{color:'var(--yellow)',fontWeight:600}}>{fmtPct(effectiveRate)}</span></p>
+      <div className="grid grid-4 mb-4">
+        <div className="card stat-card"><div className="label">Gesamtumsatz</div><div className="value">{fmt(overview.reduce((s,o)=>s+o.revenue,0))}</div></div>
+        <div className="card stat-card"><div className="label">Gesamtkosten</div><div className="value amount-negative">{fmt(overview.reduce((s,o)=>s+o.expenses,0))}</div></div>
+        <div className="card stat-card"><div className="label">Gesamtgewinn</div><div className="value amount-positive">{fmt(totalProfit)}</div></div>
+        <div className="card stat-card"><div className="label">Gesamtsteuern</div><div className="value" style={{color:'var(--yellow)'}}>{fmt(totalTax)}</div></div>
+      </div>
+      {chartData.length>0&&<div className="card mb-4"><div className="section-title">Vergleich nach Entität</div>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="#1F2937"/><XAxis dataKey="name" tick={{fill:'#6B7280',fontSize:12}}/><YAxis tick={{fill:'#6B7280',fontSize:11}} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+          <Tooltip contentStyle={{background:'#111118',border:'1px solid #2a2a3d',borderRadius:8}} formatter={v=>fmt(v)}/><Legend/>
+          <Bar dataKey="Umsatz" fill="#3B82F6" radius={[4,4,0,0]}/><Bar dataKey="Gewinn" fill="#10B981" radius={[4,4,0,0]}/><Bar dataKey="Steuern" fill="#F59E0B" radius={[4,4,0,0]}/></BarChart>
+        </ResponsiveContainer>
+      </div>}
+      {overview.map(o=>(
+        <div key={o.entity.id} className="card mb-4">
+          <div className="flex items-center gap-2 mb-4"><Icon name={o.entity.type==='company'?'building':'user'}/><span style={{fontWeight:600,fontSize:16}}>{o.entity.name}</span><span className="badge badge-blue">{o.j?.name||'N/A'}</span></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:16}}>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Umsatz</div><div style={{fontWeight:600}}>{fmt(o.revenue)}</div></div>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Kosten</div><div style={{fontWeight:600,color:'var(--red)'}}>{fmt(o.expenses)}</div></div>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Gewinn</div><div style={{fontWeight:600,color:'var(--green)'}}>{fmt(o.profit)}</div></div>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Corp Tax ({fmtPct(o.corpRate)})</div><div style={{fontWeight:600,color:'var(--yellow)'}}>{fmt(o.corpTax)}</div></div>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Dividenden ausgez.</div><div style={{fontWeight:600}}>{fmt(o.divPaid)}</div></div>
+            <div><div style={{fontSize:11,color:'var(--text3)'}}>Transfer-Steuern</div><div style={{fontWeight:600,color:'var(--yellow)'}}>{fmt(o.transferTax)}</div></div>
+          </div>
+          <div style={{borderTop:'1px solid var(--border)',marginTop:12,paddingTop:12,display:'flex',justifyContent:'space-between'}}>
+            <span style={{color:'var(--text2)',fontSize:13}}>Netto nach Steuern</span><span style={{fontSize:18,fontWeight:700,color:'var(--green)'}}>{fmt(o.netProfit)}</span>
+          </div>
+        </div>
+      ))}
+      {overview.length===0&&<div className="empty"><Icon name="globe" size={48}/><p>Keine Daten. Füge Firmen und Transaktionen hinzu.</p></div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RUNWAY
+// ═══════════════════════════════════════════════════════════════════════════
+
+function RunwayPage({store}) {
+  const [targetDate,setTargetDate]=useState('');
+  const [months,setMonths]=useState(24);
+  const now=new Date();const curMonth=now.getMonth();const curYear=now.getFullYear();
+  const totalBalance=store.accounts.reduce((s,a)=>s+a.balance,0);
+
+  // Monthly averages
+  const monthlyData=[];
+  for(let i=1;i<=6;i++){const d=new Date(curYear,curMonth-i,1);const m=d.getMonth();const y=d.getFullYear();
+    const txs=store.transactions.filter(t=>{const td=new Date(t.date);return td.getMonth()===m&&td.getFullYear()===y;});
+    monthlyData.push({exp:txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),inc:txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)});
+  }
+  const avgExp=monthlyData.reduce((s,m)=>s+m.exp,0)/(monthlyData.length||1);
+  const avgInc=monthlyData.reduce((s,m)=>s+m.inc,0)/(monthlyData.length||1);
+  const netBurn=avgExp-avgInc;
+  const runway=netBurn>0?totalBalance/netBurn:999;
+
+  // Projection
+  const proj=[];let cum=totalBalance;
+  for(let i=0;i<months;i++){
+    const d=new Date(curYear,curMonth+i+1,1);
+    cum+=avgInc-avgExp;
+    proj.push({month:d.toLocaleDateString('de-DE',{month:'short',year:'2-digit'}),income:Math.round(avgInc),expenses:Math.round(avgExp),net:Math.round(avgInc-avgExp),balance:Math.round(cum)});
+  }
+
+  // Target
+  let targetNeeded=null;
+  if(targetDate){
+    const td=new Date(targetDate);const mToTarget=(td.getFullYear()-curYear)*12+(td.getMonth()-curMonth);
+    targetNeeded=Math.max(0,netBurn*mToTarget-totalBalance);
+  }
+
+  const isDanger=runway<6&&runway<999;const isWarn=!isDanger&&runway<12&&runway<999;
+
+  return (
+    <div>
+      <h1 className="page-title">Runway & Cashflow</h1>
+      <p className="page-sub">Wie lange reicht dein Geld?</p>
+
+      <div className="grid grid-4 mb-4">
+        <div className="card stat-card" style={{borderLeft:`3px solid ${isDanger?'var(--red)':isWarn?'var(--yellow)':'var(--green)'}`}}>
+          <div className="label">Runway</div>
+          <div className="value" style={{color:isDanger?'var(--red)':isWarn?'var(--yellow)':'var(--green)'}}>{runway>=999?'∞':`${Math.round(runway)} Monate`}</div>
+        </div>
+        <div className="card stat-card"><div className="label">Gesamtvermögen</div><div className="value" style={{color:'var(--blue)'}}>{fmt(totalBalance)}</div></div>
+        <div className="card stat-card"><div className="label">Ø Ausgaben/Monat</div><div className="value amount-negative">{fmt(avgExp)}</div></div>
+        <div className="card stat-card"><div className="label">Ø Einnahmen/Monat</div><div className="value amount-positive">{fmt(avgInc)}</div><div className="sub">Net Burn: <span style={{color:netBurn>0?'var(--red)':'var(--green)'}}>{fmt(netBurn)}/Mo</span></div></div>
+      </div>
+
+      <div className="card mb-4">
+        <div className="flex items-center gap-4" style={{flexWrap:'wrap'}}>
+          <span style={{fontWeight:500}}>Zieldatum:</span>
+          <input type="date" className="input" style={{width:200}} value={targetDate} onChange={e=>setTargetDate(e.target.value)}/>
+          {targetNeeded!==null&&<div style={{marginLeft:'auto'}}>
+            {targetNeeded>0?<span style={{color:'var(--red)'}}>Du brauchst noch <b>{fmtFull(targetNeeded)}</b></span>:<span style={{color:'var(--green)',fontWeight:600}}>Du bist sicher!</span>}
+          </div>}
+        </div>
+      </div>
+
+      <div className="card mb-4">
+        <div className="flex flex-between items-center mb-4"><div className="section-title" style={{margin:0}}>Cashflow-Prognose</div>
+          <select className="input" style={{width:130}} value={months} onChange={e=>setMonths(+e.target.value)}><option value={12}>12 Monate</option><option value={24}>24 Monate</option><option value={36}>36 Monate</option><option value={48}>48 Monate</option></select>
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={proj}>
+            <defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3B82F6" stopOpacity={.3}/><stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/></linearGradient></defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1F2937"/><XAxis dataKey="month" tick={{fill:'#6B7280',fontSize:10}} interval={Math.max(0,Math.floor(proj.length/12))}/>
+            <YAxis tick={{fill:'#6B7280',fontSize:11}} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+            <Tooltip contentStyle={{background:'#111118',border:'1px solid #2a2a3d',borderRadius:8}} formatter={v=>fmt(v)}/>
+            <ReferenceLine y={0} stroke="#EF4444" strokeDasharray="5 5"/>
+            <Area type="monotone" dataKey="balance" stroke="#3B82F6" fill="url(#gb)" name="Vermögen"/>
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="card">
+        <div className="section-title">Monatliche Prognose</div>
+        <table><thead><tr><th>Monat</th><th style={{textAlign:'right'}}>Einnahmen</th><th style={{textAlign:'right'}}>Ausgaben</th><th style={{textAlign:'right'}}>Netto</th><th style={{textAlign:'right'}}>Vermögen</th></tr></thead>
+        <tbody>{proj.slice(0,24).map((p,i)=>(
+          <tr key={i} style={{background:p.balance<0?'rgba(239,68,68,.05)':''}}>
+            <td style={{color:'var(--text2)'}}>{p.month}</td>
+            <td className="amount-positive" style={{textAlign:'right'}}>{fmt(p.income)}</td>
+            <td className="amount-negative" style={{textAlign:'right'}}>{fmt(p.expenses)}</td>
+            <td style={{textAlign:'right',fontWeight:500,color:p.net>=0?'var(--green)':'var(--red)'}}>{fmt(p.net)}</td>
+            <td style={{textAlign:'right',fontWeight:600,color:p.balance>=0?'var(--blue)':'var(--red)'}}>{fmt(p.balance)}</td>
+          </tr>
+        ))}</tbody></table>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIMULATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+function SimulationPage({store}) {
+  const COLORS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#0EA5E9','#F97316'];
+
+  // Scenarios: each has a name, color, and a list of cashflow entries
+  const [scenarios, setScenarios] = useState([
+    {id:1, name:'Szenario A', color:COLORS[0], active:true, entries:[]}
+  ]);
+  const [nextScId, setNextScId] = useState(2);
+  const [months, setMonths] = useState(24);
+  const [showForm, setShowForm] = useState(null); // scenario id to add entry to
+  const [entryForm, setEntryForm] = useState({label:'',amount:'',month:'',type:'income',recurring:false,recurUntil:''});
+  const [compareBaseline, setCompareBaseline] = useState(true);
+
+  const now = new Date();
+  const curMonth = now.getMonth();
+  const curYear = now.getFullYear();
+
+  // Build month labels
+  const monthLabels = [];
+  for(let i=0;i<months;i++){
+    const d=new Date(curYear,curMonth+i+1,1);
+    monthLabels.push({key:i, label:d.toLocaleDateString('de-DE',{month:'short',year:'2-digit'}), date:d, monthIdx:d.getMonth(), yearIdx:d.getFullYear()});
+  }
+
+  // Baseline from real data (same logic as RunwayPage)
+  const totalBalance = store.accounts.reduce((s,a)=>s+a.balance,0);
+  const histData=[];
+  for(let i=1;i<=6;i++){const d=new Date(curYear,curMonth-i,1);const m=d.getMonth();const y=d.getFullYear();
+    const txs=store.transactions.filter(t=>{const td=new Date(t.date);return td.getMonth()===m&&td.getFullYear()===y;});
+    histData.push({exp:txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),inc:txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0)});
+  }
+  const avgExp=histData.reduce((s,m)=>s+m.exp,0)/(histData.length||1);
+  const avgInc=histData.reduce((s,m)=>s+m.inc,0)/(histData.length||1);
+
+  // Build baseline projection
+  const baseline=[];
+  let cum=totalBalance;
+  for(let i=0;i<months;i++){
+    cum+=avgInc-avgExp;
+    baseline.push(Math.round(cum));
+  }
+
+  // Build scenario projections
+  const scenarioProjections = scenarios.filter(s=>s.active).map(sc => {
+    let cum=totalBalance;
+    const data=[];
+    for(let i=0;i<months;i++){
+      // Start with baseline monthly flow
+      let monthNet = avgInc - avgExp;
+      const mLabel = monthLabels[i];
+      // Add scenario entries for this month
+      sc.entries.forEach(e => {
+        const eMonth = new Date(e.month+'-01');
+        const eMonthIdx = eMonth.getMonth();
+        const eYearIdx = eMonth.getFullYear();
+        if(e.recurring) {
+          const untilDate = e.recurUntil ? new Date(e.recurUntil+'-01') : new Date(curYear+10,0,1);
+          if(mLabel.date >= eMonth && mLabel.date <= untilDate) {
+            monthNet += e.type==='income' ? e.amount : -e.amount;
+          }
+        } else {
+          if(mLabel.monthIdx===eMonthIdx && mLabel.yearIdx===eYearIdx) {
+            monthNet += e.type==='income' ? e.amount : -e.amount;
+          }
+        }
+      });
+      cum+=monthNet;
+      data.push(Math.round(cum));
+    }
+    return {id:sc.id, name:sc.name, color:sc.color, data};
+  });
+
+  // Build chart data
+  const chartData = monthLabels.map((m,i)=>{
+    const d = {month:m.label};
+    if(compareBaseline) d.baseline = baseline[i];
+    scenarioProjections.forEach(sp=>{d['sc_'+sp.id]=sp.data[i];});
+    return d;
+  });
+
+  // Find best/worst scenario final values
+  const allFinals = scenarioProjections.map(sp=>({name:sp.name,color:sp.color,val:sp.data[sp.data.length-1]||0}));
+  const best = allFinals.length>0 ? allFinals.reduce((a,b)=>a.val>b.val?a:b) : null;
+  const worst = allFinals.length>0 ? allFinals.reduce((a,b)=>a.val<b.val?a:b) : null;
+
+  const addScenario = () => {
+    const id=nextScId;
+    setNextScId(id+1);
+    setScenarios([...scenarios,{id,name:`Szenario ${String.fromCharCode(64+id)}`,color:COLORS[(id-1)%COLORS.length],active:true,entries:[]}]);
+  };
+
+  const removeScenario = (id) => setScenarios(scenarios.filter(s=>s.id!==id));
+
+  const duplicateScenario = (sc) => {
+    const id=nextScId;
+    setNextScId(id+1);
+    setScenarios([...scenarios,{id,name:sc.name+' (Kopie)',color:COLORS[(id-1)%COLORS.length],active:true,entries:sc.entries.map(e=>({...e,id:Math.random()}))}]);
+  };
+
+  const toggleScenario = (id) => setScenarios(scenarios.map(s=>s.id===id?{...s,active:!s.active}:s));
+
+  const addEntry = (scId) => {
+    if(!entryForm.label||!entryForm.amount||!entryForm.month) return;
+    setScenarios(scenarios.map(s=>{
+      if(s.id!==scId) return s;
+      return {...s, entries:[...s.entries,{id:Math.random(),label:entryForm.label,amount:+entryForm.amount,month:entryForm.month,type:entryForm.type,recurring:entryForm.recurring,recurUntil:entryForm.recurUntil}]};
+    }));
+    setEntryForm({label:'',amount:'',month:'',type:'income',recurring:false,recurUntil:''});
+    setShowForm(null);
+  };
+
+  const removeEntry = (scId,eId) => setScenarios(scenarios.map(s=>{
+    if(s.id!==scId) return s;
+    return {...s, entries:s.entries.filter(e=>e.id!==eId)};
+  }));
+
+  const curMonthStr = `${curYear}-${String(curMonth+2).padStart(2,'0')}`;
+
+  return (
+    <div>
+      <h1 className="page-title">Cashflow-Simulation</h1>
+      <p className="page-sub">Was passiert wenn...? Simuliere verschiedene Einnahmen- und Ausgaben-Szenarien.</p>
+
+      <div className="grid grid-4 mb-4">
+        <div className="card stat-card"><div className="label">Aktuelles Vermögen</div><div className="value" style={{color:'var(--blue)'}}>{fmt(totalBalance)}</div></div>
+        <div className="card stat-card"><div className="label">Ø Monatl. Netto</div><div className="value" style={{color:avgInc-avgExp>=0?'var(--green)':'var(--red)'}}>{fmt(avgInc-avgExp)}</div></div>
+        {best&&<div className="card stat-card"><div className="label">Bestes Szenario ({months}M)</div><div className="value" style={{color:'var(--green)'}}>{fmt(best.val)}</div><div className="sub">{best.name}</div></div>}
+        {worst&&allFinals.length>1&&<div className="card stat-card"><div className="label">Schlechtestes ({months}M)</div><div className="value" style={{color:worst.val<0?'var(--red)':'var(--yellow)'}}>{fmt(worst.val)}</div><div className="sub">{worst.name}</div></div>}
+      </div>
+
+      {/* Scenario Manager */}
+      <div className="card mb-4">
+        <div className="flex flex-between items-center mb-4">
+          <div className="section-title" style={{margin:0}}>Szenarien ({scenarios.length})</div>
+          <button className="btn btn-primary btn-sm" onClick={addScenario}><Icon name="plus" size={12}/>Neues Szenario</button>
+        </div>
+
+        {scenarios.map(sc=>(
+          <div key={sc.id} className="card mb-4" style={{borderLeft:`3px solid ${sc.color}`,background:'var(--bg3)'}}>
+            <div className="flex flex-between items-center mb-3">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" checked={sc.active} onChange={()=>toggleScenario(sc.id)} style={{accentColor:sc.color}}/>
+                <input className="input" style={{width:200,background:'var(--bg2)',fontWeight:600}} value={sc.name}
+                  onChange={e=>setScenarios(scenarios.map(s=>s.id===sc.id?{...s,name:e.target.value}:s))}/>
+                <span style={{fontSize:12,color:'var(--text3)'}}>{sc.entries.length} Einträge</span>
+              </div>
+              <div className="flex gap-2">
+                <button className="btn btn-primary btn-sm" onClick={()=>setShowForm(showForm===sc.id?null:sc.id)}><Icon name="plus" size={12}/>{showForm===sc.id?'Abbrechen':'Zahlung hinzufügen'}</button>
+                <button className="btn btn-secondary btn-sm" onClick={()=>duplicateScenario(sc)}><Icon name="copy" size={12}/>Duplizieren</button>
+                {scenarios.length>1&&<button className="btn btn-sm btn-danger" onClick={()=>removeScenario(sc.id)}><Icon name="trash" size={12}/></button>}
+              </div>
+            </div>
+
+            {/* Entry Form */}
+            {showForm===sc.id&&<div className="card mb-3" style={{background:'var(--bg2)'}}>
+              <div className="form-row">
+                <div><span className="label-text">Bezeichnung</span><input className="input" placeholder="z.B. Projekt Alpha Zahlung" value={entryForm.label} onChange={e=>setEntryForm({...entryForm,label:e.target.value})}/></div>
+                <div><span className="label-text">Betrag (€)</span><input type="number" className="input" placeholder="50000" value={entryForm.amount} onChange={e=>setEntryForm({...entryForm,amount:e.target.value})}/></div>
+                <div><span className="label-text">Monat</span><input type="month" className="input" value={entryForm.month} onChange={e=>setEntryForm({...entryForm,month:e.target.value})} min={curMonthStr}/></div>
+                <div><span className="label-text">Typ</span><select className="input" value={entryForm.type} onChange={e=>setEntryForm({...entryForm,type:e.target.value})}><option value="income">Einnahme</option><option value="expense">Ausgabe</option></select></div>
+              </div>
+              <div className="form-row">
+                <div className="flex items-center gap-2"><input type="checkbox" checked={entryForm.recurring} onChange={e=>setEntryForm({...entryForm,recurring:e.target.checked})}/><span className="label-text" style={{margin:0}}>Monatlich wiederkehrend</span></div>
+                {entryForm.recurring&&<div><span className="label-text">Bis (optional)</span><input type="month" className="input" value={entryForm.recurUntil} onChange={e=>setEntryForm({...entryForm,recurUntil:e.target.value})} min={entryForm.month}/></div>}
+              </div>
+              <div className="flex gap-2" style={{marginTop:8}}>
+                <button className="btn btn-primary btn-sm" onClick={()=>addEntry(sc.id)}>Hinzufügen</button>
+                <button className="btn btn-secondary btn-sm" onClick={()=>setShowForm(null)}>Abbrechen</button>
+              </div>
+            </div>}
+
+            {/* Entry List */}
+            {sc.entries.length>0&&<table style={{fontSize:13}}>
+              <thead><tr><th>Bezeichnung</th><th>Typ</th><th style={{textAlign:'right'}}>Betrag</th><th>Monat</th><th>Wiederholend</th><th></th></tr></thead>
+              <tbody>{sc.entries.map(e=>(
+                <tr key={e.id}>
+                  <td style={{fontWeight:500}}>{e.label}</td>
+                  <td><span className="badge" style={{background:e.type==='income'?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',color:e.type==='income'?'var(--green)':'var(--red)'}}>{e.type==='income'?'Einnahme':'Ausgabe'}</span></td>
+                  <td style={{textAlign:'right',fontWeight:600,color:e.type==='income'?'var(--green)':'var(--red)'}}>{fmt(e.amount)}</td>
+                  <td style={{color:'var(--text2)'}}>{e.month}</td>
+                  <td style={{color:'var(--text2)'}}>{e.recurring?(e.recurUntil?`Ja, bis ${e.recurUntil}`:'Ja, unbegrenzt'):'Einmalig'}</td>
+                  <td style={{textAlign:'right'}}><button className="btn btn-sm" style={{background:'none',padding:4}} onClick={()=>removeEntry(sc.id,e.id)}><Icon name="trash" size={12}/></button></td>
+                </tr>
+              ))}</tbody>
+            </table>}
+            {sc.entries.length===0&&<div style={{padding:12,color:'var(--text3)',fontSize:13,textAlign:'center'}}>Keine Einträge — klicke + um hypothetische Zahlungen hinzuzufügen</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div className="card mb-4">
+        <div className="flex flex-between items-center mb-
