@@ -1,8 +1,9 @@
 """
 Finance Dashboard — FastAPI Backend
 """
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from datetime import date, datetime, timedelta
@@ -11,10 +12,6 @@ from typing import List, Optional
 import json
 import hashlib
 import os
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from pydantic import BaseModel as PydanticBaseModel
 
 from database import engine, get_db, Base
 from models import (
@@ -39,43 +36,7 @@ from tax_engine import compute_transfer_tax, compute_corporate_tax
 from import_engine import import_transactions
 from seed_data import seed_database
 
-
-# ── Authentication ─────────────────────────────────────────────────────────
-
-DASHBOARD_PASSWORD = os.environ.get("DASHBOARD_PASSWORD", "admin123")
-AUTH_SECRET = os.environ.get("AUTH_SECRET", "financehq-secret-key-2024")
-
-def generate_token(password: str) -> str:
-    return hashlib.sha256((password + AUTH_SECRET).encode()).hexdigest()
-
-def verify_token(token: str) -> bool:
-    expected = generate_token(DASHBOARD_PASSWORD)
-    return token == expected
-
-class AuthLoginRequest(PydanticBaseModel):
-    password: str
-
-class AuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        path = request.url.path
-        # Allow login endpoint, OPTIONS (CORS), and non-API routes
-        if (path == "/api/auth/login" or
-            request.method == "OPTIONS" or
-            not path.startswith("/api/")):
-            return await call_next(request)
-        
-        auth_header = request.headers.get("authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return JSONResponse(status_code=401, content={"detail": "Nicht authentifiziert"})
-        
-        token = auth_header[7:]
-        if not verify_token(token):
-            return JSONResponse(status_code=401, content={"detail": "Ungültiger Token"})
-        
-        return await call_next(request)
-
-
-# ── App Setup ──────────────────────────────────────────────────────────────
+# ── App Setup ───────────────────────────────────────────────────────────────────
 
 Base.metadata.create_all(bind=engine)
 
@@ -88,6 +49,54 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Authentication ─────────────────────────────────────────────────────────────
+
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "admin123")
+AUTH_SECRET = os.getenv("AUTH_SECRET", "secret-key-change-in-production")
+
+
+def generate_token(password: str) -> str:
+    """Generate auth token from password"""
+    combined = password + AUTH_SECRET
+    return hashlib.sha256(combined.encode()).hexdigest()
+
+
+def verify_token(token: str) -> bool:
+    """Verify if token is valid"""
+    expected_token = generate_token(DASHBOARD_PASSWORD)
+    return token == expected_token
+
+
+def get_auth_token(request: Request) -> str:
+    """Extract token from Authorization header"""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    return auth_header[7:]  # Remove "Bearer " prefix
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    """Middleware to protect /api/* routes except /api/auth/login"""
+
+    async def dispatch(self, request: Request, call_next):
+        # Allow /api/auth/login without auth
+        if request.url.path == "/api/auth/login":
+            return await call_next(request)
+
+        # Check auth for all other /api/* routes
+        if request.url.path.startswith("/api/"):
+            auth_header = request.headers.get("Authorization", "")
+            if not auth_header.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            token = auth_header[7:]
+            if not verify_token(token):
+                raise HTTPException(status_code=401, detail="Invalid token")
+
+        return await call_next(request)
+
 
 app.add_middleware(AuthMiddleware)
 
@@ -102,26 +111,31 @@ def on_startup():
         db.close()
 
 
-
-
-# ── Auth Endpoints ─────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════
+# AUTHENTICATION
+# ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/auth/login")
-def auth_login(req: AuthLoginRequest):
-    if req.password \!= DASHBOARD_PASSWORD:
-        raise HTTPException(status_code=401, detail="Falsches Passwort")
-    return {"token": generate_token(req.password), "authenticated": True}
+def login(data: dict):
+    """Login with password. Returns auth token."""
+    password = data.get("password", "")
+    if password != DASHBOARD_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    token = generate_token(password)
+    return {"token": token}
+
 
 @app.get("/api/auth/check")
-def auth_check(request: Request):
-    auth_header = request.headers.get("authorization", "")
-    if not auth_header.startswith("Bearer ") or not verify_token(auth_header[7:]):
-        raise HTTPException(status_code=401, detail="Nicht authentifiziert")
-    return {"authenticated": True}
+def check_auth(token: str = Depends(get_auth_token)):
+    """Verify auth token"""
+    if not verify_token(token):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return {"valid": True}
 
-# ══════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════
 # JURISDICTIONS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/jurisdictions", response_model=List[JurisdictionOut])
 def list_jurisdictions(db: Session = Depends(get_db)):
@@ -186,9 +200,9 @@ def delete_tax_rule(rid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # ENTITIES (Personal + Companies)
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/entities", response_model=List[EntityOut])
 def list_entities(entity_type: Optional[EntityType] = None, db: Session = Depends(get_db)):
@@ -229,9 +243,9 @@ def delete_entity(eid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # ACCOUNTS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/accounts", response_model=List[AccountOut])
 def list_accounts(entity_id: Optional[int] = None, db: Session = Depends(get_db)):
@@ -271,9 +285,9 @@ def delete_account(aid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # CATEGORIES
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/categories", response_model=List[CategoryOut])
 def list_categories(db: Session = Depends(get_db)):
@@ -310,9 +324,9 @@ def delete_category(cid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # TRANSACTIONS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/transactions", response_model=List[TransactionOut])
 def list_transactions(
@@ -404,9 +418,9 @@ def delete_transaction(tid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # TRANSFERS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/transfers", response_model=List[TransferOut])
 def list_transfers(
@@ -474,9 +488,9 @@ def delete_transfer(tid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # LOANS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/loans", response_model=List[LoanOut])
 def list_loans(entity_id: Optional[int] = None, db: Session = Depends(get_db)):
@@ -511,9 +525,9 @@ def create_loan_repayment(data: LoanRepaymentCreate, db: Session = Depends(get_d
     return r
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # BUDGETS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/budgets", response_model=List[BudgetOut])
 def list_budgets(year: Optional[int] = None, db: Session = Depends(get_db)):
@@ -541,9 +555,9 @@ def delete_budget(bid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # IMPORT
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/import")
 async def import_file(
@@ -563,9 +577,9 @@ async def import_file(
     return result
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # DASHBOARD & ANALYTICS
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/dashboard/summary")
 def dashboard_summary(
@@ -894,9 +908,9 @@ def monthly_trend(
     return data
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # EXCHANGE RATES
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.get("/api/exchange-rates")
 def list_exchange_rates(db: Session = Depends(get_db)):
@@ -921,11 +935,105 @@ def set_exchange_rate(
     return {"ok": True}
 
 
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 # SIMULATION
-# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════
 
 @app.post("/api/simulation")
 def run_simulation(req: schemas.SimulationRequest, db: Session = Depends(get_db)):
     """Run cashflow simulation with hypothetical scenarios."""
-    from dateutil.relat
+    from dateutil.relativedelta import relativedelta
+
+    # Current balance
+    accounts = db.query(Account).all()
+    total_balance = sum(a.balance for a in accounts)
+
+    # Compute baseline monthly averages (last 6 months)
+    now = date.today()
+    six_months_ago = now - relativedelta(months=6)
+    txs = db.query(Transaction).filter(Transaction.date >= six_months_ago).all()
+
+    monthly_expenses = {}
+    monthly_incomes = {}
+    for tx in txs:
+        key = (tx.date.year, tx.date.month)
+        if tx.type == TransactionType.EXPENSE:
+            monthly_expenses[key] = monthly_expenses.get(key, 0) + tx.amount
+        elif tx.type == TransactionType.INCOME:
+            monthly_incomes[key] = monthly_incomes.get(key, 0) + tx.amount
+
+    n_months = max(len(set(list(monthly_expenses.keys()) + list(monthly_incomes.keys()))), 1)
+    avg_exp = sum(monthly_expenses.values()) / n_months
+    avg_inc = sum(monthly_incomes.values()) / n_months
+
+    # Build month labels
+    month_labels = []
+    for i in range(req.months):
+        d = now + relativedelta(months=i + 1, day=1)
+        month_labels.append({"key": f"{d.year}-{d.month:02d}", "date": d})
+
+    # Baseline projection
+    baseline = []
+    cum = total_balance
+    for _ in range(req.months):
+        cum += avg_inc - avg_exp
+        baseline.append(round(cum, 2))
+
+    # Scenario projections
+    scenario_summaries = []
+    months_data = []
+
+    scenario_results = {}
+    for sc in req.scenarios:
+        cum = total_balance
+        sc_data = []
+        for i, ml in enumerate(month_labels):
+            month_net = avg_inc - avg_exp
+            for entry in sc.entries:
+                e_date = date(int(entry.month[:4]), int(entry.month[5:7]), 1)
+                if entry.recurring:
+                    until = date(int(entry.recur_until[:4]), int(entry.recur_until[5:7]), 1) if entry.recur_until else date(now.year + 20, 1, 1)
+                    if e_date <= ml["date"] <= until:
+                        month_net += entry.amount if entry.type == "income" else -entry.amount
+                else:
+                    if ml["date"].year == e_date.year and ml["date"].month == e_date.month:
+                        month_net += entry.amount if entry.type == "income" else -entry.amount
+            cum += month_net
+            sc_data.append(round(cum, 2))
+        scenario_results[sc.name] = sc_data
+        scenario_summaries.append({
+            "name": sc.name,
+            "final_balance": sc_data[-1] if sc_data else total_balance,
+            "delta_vs_baseline": round(sc_data[-1] - baseline[-1], 2) if sc_data and baseline else 0,
+        })
+
+    # Assemble months_data
+    for i, ml in enumerate(month_labels):
+        md = schemas.SimulationMonthData(
+            month=ml["key"],
+            baseline=baseline[i] if req.include_baseline else None,
+            scenarios={name: data[i] for name, data in scenario_results.items()},
+        )
+        months_data.append(md)
+
+    return schemas.SimulationResult(
+        current_balance=round(total_balance, 2),
+        avg_monthly_income=round(avg_inc, 2),
+        avg_monthly_expenses=round(avg_exp, 2),
+        months_data=months_data,
+        scenario_summaries=scenario_summaries,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# HEALTH
+# ══════════════════════════════════════════════════════════════════════
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "version": "1.0.0"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
