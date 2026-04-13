@@ -22,5 +22,10 @@
   ],
   "env": {
     "PYTHONUNBUFFERED": "1"
+  },
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12"
+    }
   }
 }
