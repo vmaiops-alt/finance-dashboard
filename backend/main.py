@@ -12,6 +12,7 @@ from typing import List, Optional
 import json
 import hashlib
 import os
+import schemas
 
 from database import engine, get_db, Base
 from models import (
@@ -81,19 +82,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware to protect /api/* routes except /api/auth/login"""
 
     async def dispatch(self, request: Request, call_next):
+        from starlette.responses import JSONResponse
+
         # Allow /api/auth/login without auth
         if request.url.path == "/api/auth/login":
+            return await call_next(request)
+
+        # Allow OPTIONS (CORS preflight)
+        if request.method == "OPTIONS":
             return await call_next(request)
 
         # Check auth for all other /api/* routes
         if request.url.path.startswith("/api/"):
             auth_header = request.headers.get("Authorization", "")
             if not auth_header.startswith("Bearer "):
-                raise HTTPException(status_code=401, detail="Unauthorized")
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
             token = auth_header[7:]
             if not verify_token(token):
-                raise HTTPException(status_code=401, detail="Invalid token")
+                return JSONResponse(status_code=401, content={"detail": "Invalid token"})
 
         return await call_next(request)
 
