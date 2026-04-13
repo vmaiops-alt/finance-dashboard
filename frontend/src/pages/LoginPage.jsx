@@ -60,7 +60,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || \!password}
+            disabled={loading || !password}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors"
           >
             {loading ? 'Wird geprüft...' : 'Anmelden'}
