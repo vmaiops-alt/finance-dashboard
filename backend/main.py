@@ -14,7 +14,7 @@ import hashlib
 import os
 import schemas
 
-from database import engine, get_db, Base
+from database import engine, get_db, Base, SessionLocal
 from models import (
     Jurisdiction, TaxRule, Entity, EntityType, Account, Category,
     Transaction, TransactionType, Transfer, TransferType, Currency,
@@ -59,7 +59,10 @@ app.add_middleware(
 @app.on_event("startup")
 def seed_category_keywords():
     """Add useful default keywords to categories if they have none."""
-    db = SessionLocal()
+    try:
+        db = SessionLocal()
+    except Exception:
+        return  # DB not ready yet, skip seeding
     try:
         default_keywords = {
             "Lebensmittel": ["rewe", "edeka", "aldi", "lidl", "penny", "netto", "kaufland", "flink", "gorillas", "getir", "wolt", "lieferando"],
