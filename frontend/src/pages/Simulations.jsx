@@ -59,7 +59,7 @@ function ScenarioCard({ scenario, index, onChange, onRemove }) {
   }
 
   const removeEntry = (i) => {
-    onChange({ ...scenario, entries: scenario.entries.filter((_, idx) => idx \!== i) })
+    onChange({ ...scenario, entries: scenario.entries.filter((_, idx) => idx !== i) })
   }
 
   return (
@@ -168,7 +168,7 @@ export default function Simulations() {
         {scenarios.map((sc, i) => (
           <ScenarioCard key={i} scenario={sc} index={i}
             onChange={updated => { const s = [...scenarios]; s[i] = updated; setScenarios(s) }}
-            onRemove={() => setScenarios(scenarios.filter((_, idx) => idx \!== i))} />
+            onRemove={() => setScenarios(scenarios.filter((_, idx) => idx !== i))} />
         ))}
       </div>
 
@@ -208,7 +208,7 @@ export default function Simulations() {
                 <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
                   formatter={(v) => formatCurrency(v)} labelStyle={{ color: '#9ca3af' }} />
                 <Legend />
-                {includeBaseline && result.months_data[0]?.baseline \!= null && (
+                {includeBaseline && result.months_data[0]?.baseline != null && (
                   <Line type="monotone" dataKey="baseline" name="Baseline" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                 )}
                 {scenarioNames.map((name, i) => (
@@ -237,7 +237,7 @@ export default function Simulations() {
         </div>
       )}
 
-      {\!result && \!loading && (
+      {!result && !loading && (
         <div className="text-center py-16 text-gray-500">
           <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="text-lg">Noch keine Simulation durchgeführt</p>
