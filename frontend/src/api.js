@@ -206,3 +206,4 @@ export const updateCategory = (id, data) =>
 // ── Simulation ─────────────────────────────────────────────────────────
 export const runSimulation = (data) =>
   api.post('/simulation', data).then(r => r.data)
+// v2
