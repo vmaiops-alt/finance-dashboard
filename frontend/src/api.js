@@ -21,14 +21,32 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Redirect to login on 401
+// Retry logic for Vercel serverless cold starts + 401 handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && !error.config.url.includes('/auth/')) {
+  async (error) => {
+    const config = error.config
+    const retryCount = config.__retryCount || 0
+    const maxRetries = 2
+    
+    // Check for retryable errors: 500/502/503/504 status codes or network/timeout errors
+    const isRetryableStatus = [500, 502, 503, 504].includes(error.response?.status)
+    const isNetworkError = \!error.response || error.code === 'ECONNABORTED' || error.message === 'Network Error'
+    const shouldRetry = (isRetryableStatus || isNetworkError) && retryCount < maxRetries
+    
+    if (shouldRetry) {
+      config.__retryCount = retryCount + 1
+      const delay = 1500 * config.__retryCount
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      return api(config)
+    }
+    
+    // After retries exhausted, check for 401 and redirect to login
+    if (error.response?.status === 401 && \!error.config.url.includes('/auth/')) {
       sessionStorage.removeItem('auth_token')
       window.location.href = '/login'
     }
+    
     return Promise.reject(error)
   }
 )
@@ -184,3 +202,7 @@ export const getRecurringTransactions = (entityId) =>
 
 export const updateCategory = (id, data) =>
   api.put(`/categories/${id}`, data).then(r => r.data)
+
+// ── Simulation ─────────────────────────────────────────────────────────
+export const runSimulation = (data) =>
+  api.post('/simulation', data).then(r => r.data)

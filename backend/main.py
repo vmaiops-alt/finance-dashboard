@@ -1082,15 +1082,15 @@ def run_simulation(req: schemas.SimulationRequest, db: Session = Depends(get_db)
     # Compute baseline monthly averages (last 6 months)
     now = date.today()
     six_months_ago = now - relativedelta(months=6)
-    txs = db.query(Transaction).filter(Transaction.date >= six_months_ago).all()
+    txs = db.query(Transaction).filter(Transaction.transaction_date >= six_months_ago).all()
 
     monthly_expenses = {}
     monthly_incomes = {}
     for tx in txs:
-        key = (tx.date.year, tx.date.month)
-        if tx.type == TransactionType.EXPENSE:
+        key = (tx.transaction_date.year, tx.transaction_date.month)
+        if tx.transaction_type == TransactionType.EXPENSE:
             monthly_expenses[key] = monthly_expenses.get(key, 0) + tx.amount
-        elif tx.type == TransactionType.INCOME:
+        elif tx.transaction_type == TransactionType.INCOME:
             monthly_incomes[key] = monthly_incomes.get(key, 0) + tx.amount
 
     n_months = max(len(set(list(monthly_expenses.keys()) + list(monthly_incomes.keys()))), 1)

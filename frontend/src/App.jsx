@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, Building2,
-  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard, LogOut,
+  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard, LogOut, BarChart3,
   Menu, X
 } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
@@ -12,6 +12,7 @@ import Companies from './pages/Companies'
 import Transfers from './pages/Transfers'
 import TaxOverview from './pages/TaxOverview'
 import Runway from './pages/Runway'
+import Simulations from './pages/Simulations'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { path: '/transfers', icon: ArrowLeftRight, label: 'Transfers' },
   { path: '/tax', icon: Globe, label: 'Steuern' },
   { path: '/runway', icon: TrendingUp, label: 'Runway' },
+  { path: '/simulations', icon: BarChart3, label: 'Simulationen' },
   { path: '/import', icon: Upload, label: 'Import' },
   { path: '/settings', icon: Settings, label: 'Einstellungen' },
 ]
@@ -130,6 +132,7 @@ function AppLayout() {
               <Route path="/transfers" element={<Transfers />} />
               <Route path="/tax" element={<TaxOverview />} />
               <Route path="/runway" element={<Runway />} />
+              <Route path="/simulations" element={<Simulations />} />
               <Route path="/import" element={<ImportPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
