@@ -31,7 +31,7 @@ api.interceptors.response.use(
     
     // Check for retryable errors: 500/502/503/504 status codes or network/timeout errors
     const isRetryableStatus = [500, 502, 503, 504].includes(error.response?.status)
-    const isNetworkError = \!error.response || error.code === 'ECONNABORTED' || error.message === 'Network Error'
+    const isNetworkError = !error.response || error.code === 'ECONNABORTED' || error.message === 'Network Error'
     const shouldRetry = (isRetryableStatus || isNetworkError) && retryCount < maxRetries
     
     if (shouldRetry) {
@@ -42,7 +42,7 @@ api.interceptors.response.use(
     }
     
     // After retries exhausted, check for 401 and redirect to login
-    if (error.response?.status === 401 && \!error.config.url.includes('/auth/')) {
+    if (error.response?.status === 401 && !error.config.url.includes('/auth/')) {
       sessionStorage.removeItem('auth_token')
       window.location.href = '/login'
     }
