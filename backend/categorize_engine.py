@@ -235,10 +235,88 @@ def detect_recurring_transactions(db: Session, entity_id: Optional[int] = None) 
     }
 
 
+def _ai_categorize_batch(transactions: List[Transaction], categories: List[Category]) -> dict:
+    """
+    Use Claude API to categorize transactions that keyword/rule matching couldn't handle.
+    Returns dict of {transaction_id: category_id}.
+    Falls back gracefully if no API key or on error.
+    """
+    import os
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key or not transactions:
+        return {}
+
+    try:
+        import anthropic
+    except ImportError:
+        print("anthropic package not installed — skipping AI categorization")
+        return {}
+
+    # Build category list for the prompt
+    cat_map = {c.id: c.name for c in categories}
+    cat_list = "\n".join(f"  {c.id}: {c.name}" for c in categories)
+
+    # Process in batches of 50 to stay within token limits
+    BATCH_SIZE = 50
+    all_results = {}
+
+    for batch_start in range(0, len(transactions), BATCH_SIZE):
+        batch = transactions[batch_start:batch_start + BATCH_SIZE]
+        tx_lines = []
+        for tx in batch:
+            tx_lines.append(
+                f"  ID={tx.id} | type={tx.transaction_type.value} | "
+                f"amount={tx.amount} | description=\"{tx.description or ''}\" | "
+                f"counterparty=\"{tx.counterparty or ''}\""
+            )
+        tx_block = "\n".join(tx_lines)
+
+        prompt = (
+            f"You are a financial transaction categorizer. Assign each transaction to the most appropriate category.\n\n"
+            f"Available categories:\n{cat_list}\n\n"
+            f"Transactions to categorize:\n{tx_block}\n\n"
+            f"Respond ONLY with a JSON object mapping transaction ID to category ID. "
+            f"Example: {{\"1\": 5, \"2\": 3}}\n"
+            f"If you cannot determine a category for a transaction, omit it from the response."
+        )
+
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = response.content[0].text.strip()
+
+            # Extract JSON from response (handle markdown code blocks)
+            import json as _json
+            if "```" in text:
+                # Extract content between code fences
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+
+            mapping = _json.loads(text)
+            valid_cat_ids = set(cat_map.keys())
+            for tx_id_str, cat_id in mapping.items():
+                tx_id = int(tx_id_str)
+                cat_id = int(cat_id)
+                if cat_id in valid_cat_ids:
+                    all_results[tx_id] = cat_id
+        except Exception as e:
+            print(f"AI categorization batch error (non-fatal): {e}")
+            continue
+
+    return all_results
+
+
 def auto_categorize_all(db: Session, entity_id: Optional[int] = None, only_uncategorized: bool = True) -> dict:
     """
     Run auto-categorization on all (or uncategorized) transactions.
     Uses batch processing to avoid N+1 queries.
+    Layer 4: AI categorization via Claude API for remaining uncategorized.
     """
     q = db.query(Transaction)
     if entity_id:
@@ -255,10 +333,23 @@ def auto_categorize_all(db: Session, entity_id: Optional[int] = None, only_uncat
         if tx.id in results:
             tx.category_id = results[tx.id]
 
+    # Layer 4: AI categorization for remaining uncategorized
+    remaining = [tx for tx in txs if tx.id not in results]
+    ai_categorized = 0
+    if remaining:
+        categories = db.query(Category).all()
+        ai_results = _ai_categorize_batch(remaining, categories)
+        for tx in remaining:
+            if tx.id in ai_results:
+                tx.category_id = ai_results[tx.id]
+                results[tx.id] = ai_results[tx.id]
+                ai_categorized += 1
+
     db.commit()
 
     return {
         "total_checked": len(txs),
         "categorized": len(results),
+        "ai_categorized": ai_categorized,
         "remaining_uncategorized": len(txs) - len(results),
     }

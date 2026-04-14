@@ -1,6 +1,7 @@
 """
 Finance Dashboard — FastAPI Backend
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -43,7 +44,61 @@ from seed_data import seed_database
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Finance Dashboard API", version="1.0.0")
+
+def _seed_category_keywords(db: Session):
+    """Add useful default keywords to categories if they have none (lightweight)."""
+    default_keywords = {
+        "Lebensmittel": ["rewe", "edeka", "aldi", "lidl", "penny", "netto", "kaufland", "flink", "gorillas", "getir", "wolt", "lieferando"],
+        "Transport": ["uber", "bolt", "taxi", "db ", "bahn", "flixbus", "tier", "lime", "voi", "fuel", "tankstelle", "shell", "aral"],
+        "Shopping": ["amazon", "zalando", "ebay", "otto", "mediamarkt", "saturn", "ikea", "h&m", "zara", "noon"],
+        "Abonnements": ["netflix", "spotify", "apple", "google workspace", "disney", "youtube", "adobe", "notion", "chatgpt", "openai", "claude", "resemble"],
+        "Wohnen": ["miete", "rent", "strom", "gas", "wasser", "gez", "rundfunk", "wealthcap", "hausgeld"],
+        "Versicherung": ["versicherung", "insurance", "allianz", "huk", "axa", "ergo"],
+        "Telekommunikation": ["telekom", "vodafone", "o2", "1&1", "congstar", "freenet"],
+        "Gesundheit": ["apotheke", "pharmacy", "arzt", "doctor", "krankenhaus", "hospital"],
+        "Bildung": ["udemy", "coursera", "bücher", "books"],
+        "Unterhaltung": ["kino", "cinema", "theater", "konzert", "event"],
+        "Gehalt": ["gehalt", "salary", "lohn", "wage"],
+        "Finanzen": ["zinsen", "interest", "dividende", "dividend", "kredit", "gedeon", "privacy management"],
+    }
+    categories = db.query(Category).all()
+    updated = False
+    for cat in categories:
+        cat_lower = cat.name.lower()
+        for name, keywords in default_keywords.items():
+            if name.lower() == cat_lower or cat_lower in name.lower():
+                if not cat.keywords or len(cat.keywords) == 0:
+                    cat.keywords = keywords
+                    updated = True
+                    break
+    if updated:
+        db.commit()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    """Application lifespan: seed DB only when empty for fast cold starts."""
+    db = SessionLocal()
+    try:
+        # Fast check: if entities OR categories already exist, DB is populated — skip heavy seeding
+        has_entities = db.query(Entity.id).first() is not None
+        has_categories = db.query(Category.id).first() is not None
+
+        if not has_categories:
+            # Fresh DB — seed reference data (categories, jurisdictions, tax rules)
+            seed_database(db)
+            print("✓ Fresh database seeded")
+
+        # Lightweight: ensure category keywords are populated
+        _seed_category_keywords(db)
+    except Exception as e:
+        print(f"Startup error (non-fatal): {e}")
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="Finance Dashboard API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,44 +109,6 @@ app.add_middleware(
 )
 
 
-
-# ── Seed category keywords on startup ──────────────────────────────────────
-@app.on_event("startup")
-def seed_category_keywords():
-    """Add useful default keywords to categories if they have none."""
-    try:
-        db = SessionLocal()
-    except Exception:
-        return  # DB not ready yet, skip seeding
-    try:
-        default_keywords = {
-            "Lebensmittel": ["rewe", "edeka", "aldi", "lidl", "penny", "netto", "kaufland", "flink", "gorillas", "getir", "wolt", "lieferando"],
-            "Transport": ["uber", "bolt", "taxi", "db ", "bahn", "flixbus", "tier", "lime", "voi", "fuel", "tankstelle", "shell", "aral"],
-            "Shopping": ["amazon", "zalando", "ebay", "otto", "mediamarkt", "saturn", "ikea", "h&m", "zara", "noon"],
-            "Abonnements": ["netflix", "spotify", "apple", "google workspace", "disney", "youtube", "adobe", "notion", "chatgpt", "openai", "claude", "resemble"],
-            "Wohnen": ["miete", "rent", "strom", "gas", "wasser", "gez", "rundfunk", "wealthcap", "hausgeld"],
-            "Versicherung": ["versicherung", "insurance", "allianz", "huk", "axa", "ergo"],
-            "Telekommunikation": ["telekom", "vodafone", "o2", "1&1", "congstar", "freenet"],
-            "Gesundheit": ["apotheke", "pharmacy", "arzt", "doctor", "krankenhaus", "hospital"],
-            "Bildung": ["udemy", "coursera", "bücher", "books"],
-            "Unterhaltung": ["kino", "cinema", "theater", "konzert", "event"],
-            "Gehalt": ["gehalt", "salary", "lohn", "wage"],
-            "Finanzen": ["zinsen", "interest", "dividende", "dividend", "kredit", "gedeon", "privacy management"],
-        }
-        
-        categories = db.query(Category).all()
-        for cat in categories:
-            cat_lower = cat.name.lower()
-            for name, keywords in default_keywords.items():
-                if name.lower() == cat_lower or cat_lower in name.lower():
-                    if not cat.keywords or len(cat.keywords) == 0:
-                        cat.keywords = keywords
-                        break
-        db.commit()
-    except Exception as e:
-        print(f"Keyword seeding error (non-fatal): {e}")
-    finally:
-        db.close()
 
 
 # ── Authentication ─────────────────────────────────────────────────────────────
@@ -150,14 +167,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AuthMiddleware)
 
 
-@app.on_event("startup")
-def on_startup():
-    from database import SessionLocal
-    db = SessionLocal()
-    try:
-        seed_database(db)
-    finally:
-        db.close()
+
 
 
 # ══════════════════════════════════════════════════════════════════════

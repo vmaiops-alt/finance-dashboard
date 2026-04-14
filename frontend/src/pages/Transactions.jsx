@@ -128,7 +128,8 @@ export default function Transactions() {
     setAutoCategorizingStatus('running')
     try {
       const result = await autoCategorize(filters.entity_id || null, true)
-      setAutoCategorizingStatus(`${result.categorized} von ${result.total_checked} kategorisiert`)
+      const aiNote = result.ai_categorized ? ` (${result.ai_categorized} via AI)` : ''
+      setAutoCategorizingStatus(`${result.categorized} von ${result.total_checked} kategorisiert${aiNote}`)
       load()
       setTimeout(() => setAutoCategorizingStatus(null), 4000)
     } catch (err) {
@@ -171,11 +172,11 @@ export default function Transactions() {
             >
               <Sparkles className="w-4 h-4" />
               {autoCategorizingStatus === 'running' ? (
-                <><RefreshCw className="w-3 h-3 animate-spin" /> Kategorisiere...</>
+                <><RefreshCw className="w-3 h-3 animate-spin" /> AI Kategorisiere...</>
               ) : autoCategorizingStatus ? (
                 autoCategorizingStatus
               ) : (
-                `${uncategorizedCount} auto-kategorisieren`
+                `AI Kategorisieren (${uncategorizedCount})`
               )}
             </button>
           )}
