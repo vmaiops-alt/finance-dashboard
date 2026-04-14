@@ -73,7 +73,7 @@ export default function Transfers() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Transfers</h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -153,10 +153,10 @@ export default function Transfers() {
       <div className="space-y-3">
         {transfers.map(t => (
           <div key={t.id} className="card-hover">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-1 min-w-0">
                 {/* From → To */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <div className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{ backgroundColor: getEntityColor(t.from_entity_id) + '20', color: getEntityColor(t.from_entity_id) }}>
                     {getEntityName(t.from_entity_id)}
                   </div>
@@ -170,7 +170,7 @@ export default function Transfers() {
                 {/* Date */}
                 <span className="text-sm text-gray-500">{new Date(t.transfer_date).toLocaleDateString('de-DE')}</span>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4 sm:gap-6">
                 <div className="text-right">
                   <p className="font-semibold">{formatCurrency(t.amount, t.currency)}</p>
                   {t.tax_amount > 0 && (

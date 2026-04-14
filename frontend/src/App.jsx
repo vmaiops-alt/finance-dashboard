@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Routes, Route, NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, Building2,
-  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard, LogOut
+  Upload, PieChart, TrendingUp, Settings, Receipt, Globe, CreditCard, LogOut,
+  Menu, X
 } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
@@ -31,16 +32,45 @@ const NAV_ITEMS = [
 
 function AppLayout() {
   const { logout } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
-        <div className="p-5 border-b border-gray-800">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-blue-500" />
-            <span>FinanceHQ</span>
-          </h1>
-          <p className="text-xs text-gray-500 mt-1">Personal Finance Dashboard</p>
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0
+        transform transition-transform duration-200 ease-in-out
+        lg:relative lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Wallet className="w-6 h-6 text-blue-500" />
+              <span>FinanceHQ</span>
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">Personal Finance Dashboard</p>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1 hover:bg-gray-800 rounded-lg"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -74,21 +104,38 @@ function AppLayout() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-6">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/accounts" element={<Accounts />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/companies" element={<Companies />} />
-            <Route path="/transfers" element={<Transfers />} />
-            <Route path="/tax" element={<TaxOverview />} />
-            <Route path="/runway" element={<Runway />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </div>
-      </main>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile top bar */}
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-gray-900 border-b border-gray-800 shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-1.5 hover:bg-gray-800 rounded-lg"
+          >
+            <Menu className="w-5 h-5 text-gray-300" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-blue-500" />
+            <span className="font-semibold text-sm">FinanceHQ</span>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-4 sm:p-6">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/accounts" element={<Accounts />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/companies" element={<Companies />} />
+              <Route path="/transfers" element={<Transfers />} />
+              <Route path="/tax" element={<TaxOverview />} />
+              <Route path="/runway" element={<Runway />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

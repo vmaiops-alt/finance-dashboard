@@ -146,7 +146,7 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Transaktionen</h1>
           <p className="text-gray-500 text-sm mt-1">
@@ -157,7 +157,7 @@ export default function Transactions() {
             <span className="text-white font-medium">{formatCurrency(totalIncome - totalExpenses)}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {uncategorizedCount > 0 && (
             <button
               onClick={handleAutoCategorize}

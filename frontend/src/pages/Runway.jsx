@@ -85,7 +85,7 @@ export default function Runway() {
 
       {/* Target Date */}
       <div className="card">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-2">
             <Target className="w-5 h-5 text-blue-400" />
             <span className="font-medium">Zieldatum:</span>
@@ -98,7 +98,7 @@ export default function Runway() {
             placeholder="Bis wann musst du überleben?"
           />
           {runway.amount_needed_for_target !== undefined && (
-            <div className="ml-auto">
+            <div className="sm:ml-auto">
               {runway.amount_needed_for_target > 0 ? (
                 <p className="text-red-400">
                   Du brauchst noch <span className="font-bold">{formatCurrency(runway.amount_needed_for_target)}</span> um bis {new Date(targetDate).toLocaleDateString('de-DE')} zu überleben

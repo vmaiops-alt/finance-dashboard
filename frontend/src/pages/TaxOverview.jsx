@@ -33,7 +33,7 @@ export default function TaxOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Steuerübersicht</h1>
           <p className="text-gray-500 text-sm mt-1">Effektive Steuerbelastung: <span className="text-yellow-400 font-medium">{effectiveRate}%</span></p>
@@ -99,7 +99,7 @@ export default function TaxOverview() {
               <span className="badge-blue">{entity.jurisdiction}</span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
               <div>
                 <p className="text-xs text-gray-500">Umsatz</p>
                 <p className="font-semibold">{formatCurrency(entity.revenue)}</p>

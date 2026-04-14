@@ -86,7 +86,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-900 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 bg-gray-900 p-1 rounded-lg w-full sm:w-fit overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -104,7 +104,7 @@ export default function SettingsPage() {
       {/* Jurisdictions */}
       {tab === 'jurisdictions' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <h2 className="font-semibold">Jurisdiktionen</h2>
             <button onClick={() => setShowJForm(!showJForm)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Neue Jurisdiktion</button>
           </div>
@@ -154,7 +154,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold">{j.name} <span className="text-gray-500 text-sm">({j.country_code})</span></p>
-                    <div className="flex gap-4 mt-1 text-sm text-gray-400">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-gray-400">
                       <span>Corp Tax: <span className="text-white">{(j.corporate_tax_rate * 100).toFixed(1)}%</span></span>
                       <span>PIT: <span className="text-white">{(j.personal_income_tax_rate * 100).toFixed(1)}%</span></span>
                       <span>Div WHT: <span className="text-white">{(j.dividend_withholding_tax * 100).toFixed(1)}%</span></span>
@@ -175,7 +175,7 @@ export default function SettingsPage() {
       {/* Tax Rules */}
       {tab === 'taxrules' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <h2 className="font-semibold">Steuerregeln</h2>
             <button onClick={() => setShowRuleForm(!showRuleForm)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Neue Regel</button>
           </div>
@@ -246,7 +246,7 @@ export default function SettingsPage() {
       {/* Categories */}
       {tab === 'categories' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <h2 className="font-semibold">Kategorien</h2>
             <button onClick={() => setShowCatForm(!showCatForm)} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Neue Kategorie</button>
           </div>
