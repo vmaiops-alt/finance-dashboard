@@ -173,10 +173,11 @@ export const deleteCategoryRule = (id) =>
 export const patchTransaction = (id, data) =>
   api.patch(`/transactions/${id}`, data).then(r => r.data)
 
-export const autoCategorize = (entityId, onlyUncategorized = true) =>
-  api.post('/transactions/auto-categorize', null, {
-    params: { entity_id: entityId, only_uncategorized: onlyUncategorized }
-  }).then(r => r.data)
+export const autoCategorize = (entityId, onlyUncategorized = true) => {
+  const params = { only_uncategorized: onlyUncategorized }
+  if (entityId) params.entity_id = entityId
+  return api.post('/transactions/auto-categorize', null, { params }).then(r => r.data)
+}
 
 export const getRecurringTransactions = (entityId) =>
   api.get('/transactions/recurring', { params: { entity_id: entityId } }).then(r => r.data)

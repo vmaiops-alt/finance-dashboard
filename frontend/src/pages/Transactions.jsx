@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Receipt, Plus, Trash2, Filter, Tag, Sparkles, RefreshCw, ChevronDown, X, Check } from 'lucide-react'
+import { Receipt, Plus, Trash2, Filter, Tag, Sparkles, RefreshCw, ChevronDown, X, Check, Building2 } from 'lucide-react'
 import { getTransactions, createTransaction, deleteTransaction, getEntities, getAccounts, getCategories, patchTransaction, autoCategorize } from '../api'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'AED', 'CHF']
@@ -63,7 +63,7 @@ export default function Transactions() {
   const [accounts, setAccounts] = useState([])
   const [categories, setCategories] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [filters, setFilters] = useState({ entity_id: '', tx_type: '', category_id: '' })
+  const [filters, setFilters] = useState({ entity_id: '', tx_type: '', category_id: '', account_id: '' })
   const [editingCategoryId, setEditingCategoryId] = useState(null)
   const [autoCategorizingStatus, setAutoCategorizingStatus] = useState(null)
   const [form, setForm] = useState({
@@ -77,6 +77,7 @@ export default function Transactions() {
     if (filters.entity_id) params.entity_id = filters.entity_id
     if (filters.tx_type) params.tx_type = filters.tx_type
     if (filters.category_id) params.category_id = filters.category_id
+    if (filters.account_id) params.account_id = filters.account_id
     Promise.all([
       getTransactions(params),
       getEntities(),
@@ -129,16 +130,20 @@ export default function Transactions() {
       const result = await autoCategorize(filters.entity_id || null, true)
       setAutoCategorizingStatus(`${result.categorized} von ${result.total_checked} kategorisiert`)
       load()
-      setTimeout(() => setAutoCategorizingStatus(null), 3000)
+      setTimeout(() => setAutoCategorizingStatus(null), 4000)
     } catch (err) {
-      setAutoCategorizingStatus('Fehler')
-      setTimeout(() => setAutoCategorizingStatus(null), 3000)
+      console.error('Auto-categorize error:', err)
+      setAutoCategorizingStatus('Fehler: ' + (err.response?.data?.detail || err.message))
+      setTimeout(() => setAutoCategorizingStatus(null), 5000)
     }
   }
 
   const getCategoryName = (id) => categories.find(c => c.id === id)?.name || ''
   const getCategoryColor = (id) => categories.find(c => c.id === id)?.color || '#6B7280'
   const getEntityName = (id) => entities.find(e => e.id === id)?.name || ''
+
+  // Build unique bank list from accounts
+  const bankList = [...new Set(accounts.map(a => a.bank_name).filter(Boolean))]
 
   const totalIncome = transactions.filter(t => t.transaction_type === 'income').reduce((s, t) => s + t.amount, 0)
   const totalExpenses = transactions.filter(t => t.transaction_type === 'expense').reduce((s, t) => s + t.amount, 0)
@@ -195,6 +200,10 @@ export default function Transactions() {
           <option value="">Alle Kategorien</option>
           <option value="uncategorized">Unkategorisiert</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select className="select text-sm" value={filters.account_id} onChange={e => setFilters({ ...filters, account_id: e.target.value })}>
+          <option value="">Alle Konten / Banken</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}{a.bank_name ? ` (${a.bank_name})` : ''}</option>)}
         </select>
       </div>
 
@@ -269,6 +278,7 @@ export default function Transactions() {
               <th className="text-left py-3 px-2">Datum</th>
               <th className="text-left py-3 px-2">Beschreibung</th>
               <th className="text-left py-3 px-2">Kategorie</th>
+              <th className="text-left py-3 px-2">Konto / Bank</th>
               <th className="text-left py-3 px-2">Entität</th>
               <th className="text-right py-3 px-2">Betrag</th>
               <th className="text-right py-3 px-2"></th>
@@ -277,11 +287,11 @@ export default function Transactions() {
           <tbody>
             {transactions.map(tx => (
               <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                <td className="py-2.5 px-2 text-gray-400">
+                <td className="py-2.5 px-2 text-gray-400 whitespace-nowrap">
                   {new Date(tx.transaction_date).toLocaleDateString('de-DE')}
                   {tx.is_recurring && (
                     <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                      <RefreshCw className="w-2.5 h-2.5 mr-0.5" />{tx.recurring_interval}
+                      <RefreshCw className="w-2.5 h-2.5 mr-0.5" />{tx.recurring_interval === 'monthly' ? 'Mtl.' : tx.recurring_interval === 'weekly' ? 'Wtl.' : tx.recurring_interval}
                     </span>
                   )}
                 </td>
@@ -311,8 +321,18 @@ export default function Transactions() {
                     />
                   )}
                 </td>
+                <td className="py-2.5 px-2">
+                  {tx.account_name ? (
+                    <div>
+                      <p className="text-sm text-gray-300">{tx.account_name}</p>
+                      {tx.bank_name && <p className="text-xs text-gray-500">{tx.bank_name}</p>}
+                    </div>
+                  ) : (
+                    <span className="text-gray-600 text-xs">—</span>
+                  )}
+                </td>
                 <td className="py-2.5 px-2 text-gray-400">{getEntityName(tx.entity_id)}</td>
-                <td className={`py-2.5 px-2 text-right font-semibold ${tx.transaction_type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
+                <td className={`py-2.5 px-2 text-right font-semibold whitespace-nowrap ${tx.transaction_type === 'income' ? 'text-emerald-400' : 'text-red-400'}`}>
                   {tx.transaction_type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
                 </td>
                 <td className="py-2.5 px-2 text-right">

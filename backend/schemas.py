@@ -113,6 +113,8 @@ class TransactionOut(TransactionCreate):
     is_imported: bool
     import_source: str
     created_at: datetime
+    account_name: Optional[str] = None
+    bank_name: Optional[str] = None
     class Config:
         from_attributes = True
 

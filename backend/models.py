@@ -152,6 +152,14 @@ class Transaction(Base):
     account = relationship("Account", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")
 
+    @property
+    def account_name(self):
+        return self.account.name if self.account else None
+
+    @property
+    def bank_name(self):
+        return self.account.bank_name if self.account else None
+
 
 # ── Transfer (between entities) ────────────────────────────────────────────
 

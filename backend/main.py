@@ -4,7 +4,7 @@ Finance Dashboard — FastAPI Backend
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, extract
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -52,6 +52,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+# ── Seed category keywords on startup ──────────────────────────────────────
+@app.on_event("startup")
+def seed_category_keywords():
+    """Add useful default keywords to categories if they have none."""
+    db = SessionLocal()
+    try:
+        default_keywords = {
+            "Lebensmittel": ["rewe", "edeka", "aldi", "lidl", "penny", "netto", "kaufland", "flink", "gorillas", "getir", "wolt", "lieferando"],
+            "Transport": ["uber", "bolt", "taxi", "db ", "bahn", "flixbus", "tier", "lime", "voi", "fuel", "tankstelle", "shell", "aral"],
+            "Shopping": ["amazon", "zalando", "ebay", "otto", "mediamarkt", "saturn", "ikea", "h&m", "zara", "noon"],
+            "Abonnements": ["netflix", "spotify", "apple", "google workspace", "disney", "youtube", "adobe", "notion", "chatgpt", "openai", "claude", "resemble"],
+            "Wohnen": ["miete", "rent", "strom", "gas", "wasser", "gez", "rundfunk", "wealthcap", "hausgeld"],
+            "Versicherung": ["versicherung", "insurance", "allianz", "huk", "axa", "ergo"],
+            "Telekommunikation": ["telekom", "vodafone", "o2", "1&1", "congstar", "freenet"],
+            "Gesundheit": ["apotheke", "pharmacy", "arzt", "doctor", "krankenhaus", "hospital"],
+            "Bildung": ["udemy", "coursera", "bücher", "books"],
+            "Unterhaltung": ["kino", "cinema", "theater", "konzert", "event"],
+            "Gehalt": ["gehalt", "salary", "lohn", "wage"],
+            "Finanzen": ["zinsen", "interest", "dividende", "dividend", "kredit", "gedeon", "privacy management"],
+        }
+        
+        categories = db.query(Category).all()
+        for cat in categories:
+            cat_lower = cat.name.lower()
+            for name, keywords in default_keywords.items():
+                if name.lower() == cat_lower or cat_lower in name.lower():
+                    if not cat.keywords or len(cat.keywords) == 0:
+                        cat.keywords = keywords
+                        break
+        db.commit()
+    except Exception as e:
+        print(f"Keyword seeding error (non-fatal): {e}")
+    finally:
+        db.close()
 
 
 # ── Authentication ─────────────────────────────────────────────────────────────
@@ -368,7 +405,7 @@ def delete_category_rule(rid: int, db: Session = Depends(get_db)):
 def list_transactions(
     entity_id: Optional[int] = None,
     account_id: Optional[int] = None,
-    category_id: Optional[int] = None,
+    category_id: Optional[str] = None,
     tx_type: Optional[TransactionType] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
@@ -376,13 +413,19 @@ def list_transactions(
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
-    q = db.query(Transaction)
+    q = db.query(Transaction).options(joinedload(Transaction.account))
     if entity_id:
         q = q.filter(Transaction.entity_id == entity_id)
     if account_id:
         q = q.filter(Transaction.account_id == account_id)
     if category_id:
-        q = q.filter(Transaction.category_id == category_id)
+        if category_id == "uncategorized":
+            q = q.filter(Transaction.category_id.is_(None))
+        else:
+            try:
+                q = q.filter(Transaction.category_id == int(category_id))
+            except (ValueError, TypeError):
+                pass
     if tx_type:
         q = q.filter(Transaction.transaction_type == tx_type)
     if date_from:
@@ -484,8 +527,13 @@ def auto_categorize_transactions(
     db: Session = Depends(get_db),
 ):
     """Run auto-categorization on transactions using rules + keywords + AI."""
-    result = auto_categorize_all(db, entity_id, only_uncategorized)
-    return result
+    try:
+        result = auto_categorize_all(db, entity_id, only_uncategorized)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/transactions/recurring")
